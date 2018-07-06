@@ -42,7 +42,7 @@ subprojects {
   apply plugin: 'java'
   apply plugin: 'jacoco'
   def snapshotSuffix = rootProject.hasProperty('release') ? '' : '-SNAPSHOT'
-  group = 'org.ow2.asm'
+  group = 'consulo.internal.org.ow2.asm'
   version = '6.2' + snapshotSuffix
   sourceCompatibility = '1.6'
   targetCompatibility = '1.6'
@@ -347,7 +347,7 @@ configure(subprojects.findAll { it.provides }) {
     pom.project {
       parent {
         artifactId 'ow2'
-        groupId 'org.ow2'
+        groupId 'consulo.internal.org.ow2'
         version '1.5'
       }
 
