@@ -334,11 +334,10 @@ configure(subprojects.findAll { it.provides }) {
     def nexusUserName = System.env.NEXUS_USER_NAME
     def nexusPassword = System.env.NEXUS_PASSWORD
     if (nexusUserName != null) {
-      def baseUrl = 'http://repository.ow2.org/nexus/'
-      repository(url: baseUrl + 'service/local/staging/deploy/maven2') {
+      repository(url: 'https://maven.consulo.io/repository/snapshots/') {
         authentication(userName: nexusUserName, password: nexusPassword)
       }
-      snapshotRepository(url: baseUrl + 'content/repositories/snapshots') {
+        repository(url: 'https://maven.consulo.io/repository/snapshots/') {
         authentication(userName: nexusUserName, password: nexusPassword)
       }
     } else {
