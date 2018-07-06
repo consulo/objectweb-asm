@@ -334,10 +334,7 @@ configure(subprojects.findAll { it.provides }) {
     def nexusUserName = System.env.NEXUS_USER_NAME
     def nexusPassword = System.env.NEXUS_PASSWORD
     if (nexusUserName != null) {
-      repository(url: 'https://maven.consulo.io/repository/snapshots/') {
-        authentication(userName: nexusUserName, password: nexusPassword)
-      }
-        repository(url: 'https://maven.consulo.io/repository/snapshots/') {
+      snapshotRepository(url: 'https://maven.consulo.io/repository/snapshots/') {
         authentication(userName: nexusUserName, password: nexusPassword)
       }
     } else {
