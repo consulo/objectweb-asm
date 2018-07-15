@@ -341,12 +341,6 @@ configure(subprojects.findAll { it.provides }) {
       repository url: 'file://localhost/tmp/myRepo/'
     }
     pom.project {
-      parent {
-        artifactId 'ow2'
-        groupId 'consulo.internal.org.ow2'
-        version '1.5'
-      }
-
       name jar.baseName
       description project.description
       packaging 'jar'
@@ -359,29 +353,6 @@ configure(subprojects.findAll { it.provides }) {
       }
 
       url 'http://asm.ow2.org/'
-      mailingLists {
-        mailingList {
-          name 'ASM Users List'
-          subscribe 'https://mail.ow2.org/wws/subscribe/asm'
-          post 'asm@objectweb.org'
-          archive 'https://mail.ow2.org/wws/arc/asm/'
-        }
-        mailingList {
-          name 'ASM Team List'
-          subscribe 'https://mail.ow2.org/wws/subscribe/asm-team'
-          post 'asm-team@objectweb.org'
-          archive 'https://mail.ow2.org/wws/arc/asm-team/'
-        }
-      }
-      issueManagement {
-        url 'https://gitlab.ow2.org/asm/asm/issues'
-      }
-      scm {
-        connection 'scm:git:https://gitlab.ow2.org/asm/asm/'
-        developerConnection 'scm:git:https://gitlab.ow2.org/asm/asm/'
-        url 'https://gitlab.ow2.org/asm/asm/'
-      }
-
       developers {
         developer {
           name 'Eric Bruneton'
