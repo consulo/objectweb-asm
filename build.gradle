@@ -42,7 +42,7 @@ subprojects {
   apply plugin: 'java'
   apply plugin: 'jacoco'
   def snapshotSuffix = rootProject.hasProperty('release') ? '' : '-SNAPSHOT'
-  group = 'consulo.internal.org.ow2.asm'
+  group = 'org.ow2.asm'
   version = '6.2' + snapshotSuffix
   sourceCompatibility = '1.6'
   targetCompatibility = '1.6'
@@ -116,7 +116,7 @@ project(':benchmarks') {
   targetCompatibility = '1.8'
   dependencies {
     compile files('libs/csg-bytecode-1.0.0.jar', 'libs/jclasslib.jar')
-    jmh project(':asm'), project(':asm-tree') 
+    jmh project(':asm'), project(':asm-tree')
   }
   depends = [
     'kawa:kawa:1.7',
@@ -153,21 +153,15 @@ project(':tools') {
 
 project(':tools:bnd-module-plugin') {
   description = "bnd plugin to build moduleinfo with ${rootProject.description}"
+  // TODO: this compiles asm twice (here and in :asm), find a way to avoid this.
+  sourceSets.main.java.srcDirs += project(':asm').sourceSets.main.java.srcDirs
   depends = ['biz.aQute.bnd:biz.aQute.bnd:3.4.0']
-  def asmClasses = project(':asm').sourceSets.main.output
-  dependencies {
-    implementation asmClasses
-  }
-  jar {
-    from asmClasses
-  }
 }
 
 project(':tools:retrofitter') {
   description = "JDK 1.5 class retrofitter based on ${rootProject.description}"
-  dependencies {
-    implementation project(':asm').sourceSets.main.output
-  }
+  // TODO: this compiles asm thrice (here, above and in :asm).
+  sourceSets.main.java.srcDirs += project(':asm').sourceSets.main.java.srcDirs
 }
 
 // -----------------------------------------------------------------------------
@@ -223,7 +217,8 @@ configure(subprojects.findAll { it.provides }) {
       main 'org.objectweb.asm.tools.Retrofitter'
       args sourceSets.main.output.classesDirs
     }
-    jar.dependsOn tasks.retrofit
+    compileJava.dependsOn ':tools:retrofitter:classes'
+    compileJava.doLast { tasks.retrofit.execute() }
   }
 
   // Create one backward compatibility checking task for each 'sigtest-*' file
@@ -269,7 +264,7 @@ configure(subprojects.findAll { it.provides }) {
     }
   }
 
-  // Apply the biz.aQute.bnd plugin to package the project as an OSGi bundle, 
+  // Apply the biz.aQute.bnd plugin to package the project as an OSGi bundle,
   // with a custom plugin to generate and include a module-info class. Exclude
   // the asm-test project (the DefaultPackage class prevents it from being a
   // proper bundle).
@@ -279,7 +274,7 @@ configure(subprojects.findAll { it.provides }) {
     jar.manifest.attributes(
       '-classpath': sourceSets.main.output.classesDirs.asPath,
       '-plugin': 'org.objectweb.asm.tools.ModuleInfoBndPlugin;',
-      '-pluginpath': 
+      '-pluginpath':
           project(':tools:bnd-module-plugin').jar.outputs.files.singleFile,
       '-removeheaders': 'Bnd-LastModified,Build-By,Created-By,Include-Resource,\
           Require-Capability,Tool',
@@ -288,7 +283,7 @@ configure(subprojects.findAll { it.provides }) {
       'Bundle-SymbolicName': provides[0],
       'Export-Package': provides.collect{"${it};version=${version}"}.join(','),
       'Implementation-Title': project.description,
-      'Module-Requires': 
+      'Module-Requires':
           requires
               .collect{"${project(it).provides[0]};transitive=true"}
               .join(',')
@@ -304,7 +299,7 @@ configure(subprojects.findAll { it.provides }) {
 
   // Add a task to generate a private javadoc and add it as a dependency of the
   // 'check' task.
-  task privateJavadoc(type: Javadoc) {    
+  task privateJavadoc(type: Javadoc) {
     source = sourceSets.main.allJava
     classpath = configurations.compile
     destinationDir = file("${javadoc.destinationDir}-private")
@@ -334,13 +329,23 @@ configure(subprojects.findAll { it.provides }) {
     def nexusUserName = System.env.NEXUS_USER_NAME
     def nexusPassword = System.env.NEXUS_PASSWORD
     if (nexusUserName != null) {
-      snapshotRepository(url: 'https://maven.consulo.io/repository/snapshots/') {
+      def baseUrl = 'http://repository.ow2.org/nexus/'
+      repository(url: baseUrl + 'service/local/staging/deploy/maven2') {
+        authentication(userName: nexusUserName, password: nexusPassword)
+      }
+      snapshotRepository(url: baseUrl + 'content/repositories/snapshots') {
         authentication(userName: nexusUserName, password: nexusPassword)
       }
     } else {
       repository url: 'file://localhost/tmp/myRepo/'
     }
     pom.project {
+      parent {
+        artifactId 'ow2'
+        groupId 'org.ow2'
+        version '1.5'
+      }
+
       name jar.baseName
       description project.description
       packaging 'jar'
@@ -353,6 +358,29 @@ configure(subprojects.findAll { it.provides }) {
       }
 
       url 'http://asm.ow2.org/'
+      mailingLists {
+        mailingList {
+          name 'ASM Users List'
+          subscribe 'https://mail.ow2.org/wws/subscribe/asm'
+          post 'asm@objectweb.org'
+          archive 'https://mail.ow2.org/wws/arc/asm/'
+        }
+        mailingList {
+          name 'ASM Team List'
+          subscribe 'https://mail.ow2.org/wws/subscribe/asm-team'
+          post 'asm-team@objectweb.org'
+          archive 'https://mail.ow2.org/wws/arc/asm-team/'
+        }
+      }
+      issueManagement {
+        url 'https://gitlab.ow2.org/asm/asm/issues'
+      }
+      scm {
+        connection 'scm:git:https://gitlab.ow2.org/asm/asm/'
+        developerConnection 'scm:git:https://gitlab.ow2.org/asm/asm/'
+        url 'https://gitlab.ow2.org/asm/asm/'
+      }
+
       developers {
         developer {
           name 'Eric Bruneton'
