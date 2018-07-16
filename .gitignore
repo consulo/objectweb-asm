@@ -15,3 +15,5 @@ build/
 
 # Files genereated by Consulo
 .consulo/
+
+target/
