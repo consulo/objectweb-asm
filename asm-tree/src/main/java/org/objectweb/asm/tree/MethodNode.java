@@ -27,18 +27,10 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.tree;
 
+import org.objectweb.asm.*;
+
 import java.util.ArrayList;
 import java.util.List;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.Attribute;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ConstantDynamic;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.TypePath;
 
 /**
  * A node that represents a method.
@@ -566,7 +558,7 @@ public class MethodNode extends MethodVisitor {
    */
   protected LabelNode getLabelNode(final Label label) {
     if (!(label.info instanceof LabelNode)) {
-      label.info = new LabelNode(label); //[JB: needed for Coverage agent]
+      label.info = new LabelNode();
     }
     return (LabelNode) label.info;
   }
