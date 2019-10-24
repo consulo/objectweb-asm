@@ -28,7 +28,9 @@
 
 package org.objectweb.asm.commons;
 
+import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
@@ -144,9 +146,13 @@ public abstract class Remapper {
   }
 
   /**
-   * Returns the given value, remapped with this remapper.
+   * Returns the given value, remapped with this remapper. Possible values are {@link Boolean},
+   * {@link Byte}, {@link Short}, {@link Character}, {@link Integer}, {@link Long}, {@link Double},
+   * {@link Float}, {@link String}, {@link Type}, {@link Handle}, {@link ConstantDynamic} or arrays
+   * of primitive types .
    *
-   * @param value an object. Only {@link Type} and {@link Handle} values are remapped.
+   * @param value an object. Only {@link Type}, {@link Handle} and {@link ConstantDynamic} values
+   *     are remapped.
    * @return the given value, remapped with this remapper.
    */
   public Object mapValue(final Object value) {
@@ -159,8 +165,25 @@ public abstract class Remapper {
           handle.getTag(),
           mapType(handle.getOwner()),
           mapMethodName(handle.getOwner(), handle.getName(), handle.getDesc()),
-          mapMethodDesc(handle.getDesc()),
+          handle.getTag() <= Opcodes.H_PUTSTATIC
+              ? mapDesc(handle.getDesc())
+              : mapMethodDesc(handle.getDesc()),
           handle.isInterface());
+    }
+    if (value instanceof ConstantDynamic) {
+      ConstantDynamic constantDynamic = (ConstantDynamic) value;
+      int bootstrapMethodArgumentCount = constantDynamic.getBootstrapMethodArgumentCount();
+      Object[] remappedBootstrapMethodArguments = new Object[bootstrapMethodArgumentCount];
+      for (int i = 0; i < bootstrapMethodArgumentCount; ++i) {
+        remappedBootstrapMethodArguments[i] =
+            mapValue(constantDynamic.getBootstrapMethodArgument(i));
+      }
+      String descriptor = constantDynamic.getDescriptor();
+      return new ConstantDynamic(
+          mapInvokeDynamicMethodName(constantDynamic.getName(), descriptor),
+          mapDesc(descriptor),
+          (Handle) mapValue(constantDynamic.getBootstrapMethod()),
+          remappedBootstrapMethodArguments);
     }
     return value;
   }
@@ -215,6 +238,31 @@ public abstract class Remapper {
   }
 
   /**
+   * Maps an inner class name to its new name. The default implementation of this method provides a
+   * strategy that will work for inner classes produced by Java, but not necessarily other
+   * languages. Subclasses can override.
+   *
+   * @param name the fully-qualified internal name of the inner class.
+   * @param ownerName the internal name of the owner class of the inner class.
+   * @param innerName the internal name of the inner class.
+   * @return the new inner name of the inner class.
+   */
+  public String mapInnerClassName(
+      final String name, final String ownerName, final String innerName) {
+    final String remappedInnerName = this.mapType(name);
+    if (remappedInnerName.contains("$")) {
+      int index = remappedInnerName.lastIndexOf('$') + 1;
+      while (index < remappedInnerName.length()
+          && Character.isDigit(remappedInnerName.charAt(index))) {
+        index++;
+      }
+      return remappedInnerName.substring(index);
+    } else {
+      return innerName;
+    }
+  }
+
+  /**
    * Maps a method name to its new name. The default implementation of this method returns the given
    * name, unchanged. Subclasses can override.
    *
@@ -228,8 +276,8 @@ public abstract class Remapper {
   }
 
   /**
-   * Maps an invokedynamic method name to its new name. The default implementation of this method
-   * returns the given name, unchanged. Subclasses can override.
+   * Maps an invokedynamic or a constant dynamic method name to its new name. The default
+   * implementation of this method returns the given name, unchanged. Subclasses can override.
    *
    * @param name the name of the method.
    * @param descriptor the descriptor of the method.
@@ -253,8 +301,8 @@ public abstract class Remapper {
   }
 
   /**
-   * Maps a package name to its new name. The default implementation of this method returns the given
-   * name, unchanged. Subclasses can override.
+   * Maps a package name to its new name. The default implementation of this method returns the
+   * given name, unchanged. Subclasses can override.
    *
    * @param name the fully qualified name of the package (using dots).
    * @return the new name of the package.

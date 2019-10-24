@@ -29,12 +29,12 @@ package org.objectweb.asm.benchmarks;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.util.ArrayList;
 
 /**
@@ -44,26 +44,51 @@ import java.util.ArrayList;
  */
 public abstract class AbstractBenchmark {
 
-  // The directories where the different versions of ASM can be found.
+  // The root directory of the ASM project.
+  private static final String ROOT_DIR = System.getProperty("user.dir");
+
+  // The sub directories of ROOT_DIR where the different versions of ASM can be found.
   private static final String BUILD_DIR = "/benchmarks/build/";
   private static final String ASM4_0 = BUILD_DIR + "asm4.0/";
   private static final String ASM5_0 = BUILD_DIR + "asm5.0.1/";
   private static final String ASM6_0 = BUILD_DIR + "asm6.0/";
-  private static final String ASM_CORE_6_1 = "/asm/build/classes/java/main/";
-  private static final String ASM_TREE_6_1 = "/asm-tree/build/classes/java/main/";
+  private static final String ASM6_1 = BUILD_DIR + "asm6.1.1/";
+  private static final String ASM6_2 = BUILD_DIR + "asm6.2.1/";
+  private static final String ASM7_0 = BUILD_DIR + "asm7.0/";
+
+  // The directories where the Java 1.5 input data classes for the benchmarks can be found.
+  private static final String ASM_CORE_CURRENT = "/asm/build/classes/java/main/";
+  private static final String ASM_TREE_CURRENT = "/asm-tree/build/classes/java/main/";
+
+  // The directory where the Java 8 input data classes for the benchmarks can be found.
+  private static final String INPUT_CLASSES_JAVA8 =
+      "/benchmarks/build/input-classes-java8/io/vavr/control/";
 
   private final String asmBenchmarkClass;
-  private final String userDir;
 
-  /** Some class files that can be used as input data for benchmarks. */
-  protected ArrayList<byte[]> classFiles;
+  /**
+   * Some Java 1.5 class files that can be used as input data for benchmarks. These classes do not
+   * have stack map frames, invokedynamic, etc, and thus cannot be used to benchmark ASM performance
+   * for these features. However, they can be used to compare ASM with other libraries that don't
+   * support these class file features (including ASM itself, before ASM 5.0).
+   */
+  ArrayList<byte[]> classFiles;
+
+  /**
+   * Some Java 8 class files that can be used as input data for ASM benchmarks. These classes
+   * contain stack map frames and invokedynamic instructions.
+   */
+  ArrayList<byte[]> java8classFiles;
 
   /** The ASM versions that can be benchmarked. */
   public enum AsmVersion {
     V4_0,
     V5_0,
     V6_0,
-    V6_1;
+    V6_1,
+    V6_2,
+    V7_0,
+    V_CURRENT;
 
     URL[] getUrls(final String baseUrl) throws MalformedURLException {
       switch (this) {
@@ -74,7 +99,15 @@ public abstract class AbstractBenchmark {
         case V6_0:
           return new URL[] {new URL(baseUrl + ASM6_0)};
         case V6_1:
-          return new URL[] {new URL(baseUrl + ASM_CORE_6_1), new URL(baseUrl + ASM_TREE_6_1)};
+          return new URL[] {new URL(baseUrl + ASM6_1)};
+        case V6_2:
+          return new URL[] {new URL(baseUrl + ASM6_2)};
+        case V7_0:
+          return new URL[] {new URL(baseUrl + ASM7_0)};
+        case V_CURRENT:
+          return new URL[] {
+            new URL(baseUrl + ASM_CORE_CURRENT), new URL(baseUrl + ASM_TREE_CURRENT)
+          };
         default:
           throw new AssertionError();
       }
@@ -88,14 +121,15 @@ public abstract class AbstractBenchmark {
    */
   protected AbstractBenchmark(final String asmBenchmarkClass) {
     this.asmBenchmarkClass = asmBenchmarkClass;
-    this.userDir = System.getProperty("user.dir");
   }
 
   /** Creates and populates {@link #classFiles} with some class files read from disk. */
   protected void prepareClasses() throws IOException {
-    classFiles = new ArrayList<byte[]>();
-    findClasses(new File(userDir + ASM_CORE_6_1), classFiles);
-    findClasses(new File(userDir + ASM_TREE_6_1), classFiles);
+    classFiles = new ArrayList<>();
+    java8classFiles = new ArrayList<>();
+    findClasses(new File(ROOT_DIR + ASM_CORE_CURRENT), classFiles);
+    findClasses(new File(ROOT_DIR + ASM_TREE_CURRENT), classFiles);
+    findClasses(new File(ROOT_DIR + INPUT_CLASSES_JAVA8), java8classFiles);
   }
 
   private static void findClasses(final File directory, final ArrayList<byte[]> classFiles)
@@ -104,14 +138,13 @@ public abstract class AbstractBenchmark {
       if (file.isDirectory()) {
         findClasses(file, classFiles);
       } else if (file.getName().endsWith(".class")) {
-        classFiles.add(readInputStream(new FileInputStream(file)));
+        classFiles.add(readInputStream(Files.newInputStream(file.toPath())));
       }
     }
   }
 
   private static byte[] readInputStream(final InputStream inputStream) throws IOException {
-    try {
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
       byte[] data = new byte[8192];
       int bytesRead;
       while ((bytesRead = inputStream.read(data, 0, data.length)) != -1) {
@@ -119,12 +152,6 @@ public abstract class AbstractBenchmark {
       }
       outputStream.flush();
       return outputStream.toByteArray();
-    } finally {
-      try {
-        inputStream.close();
-      } catch (IOException e) {
-        // Nothing to do.
-      }
     }
   }
 
@@ -134,23 +161,21 @@ public abstract class AbstractBenchmark {
     /**
      * Constructs an {@link AsmBenchmarkFactory}.
      *
-     * @param asmDirectories the directories where the ASM library classes can be found.
-     * @param asmBenchmarkClass the class that must be instantiated by this factory.
-     * @throws MalformedURLException
+     * @param asmVersion the ASM version to use.
+     * @throws MalformedURLException if the ROOT_DIR path is malformed.
      */
     AsmBenchmarkFactory(final AsmVersion asmVersion) throws MalformedURLException {
-      super(asmVersion.getUrls("file://" + userDir));
+      super(asmVersion.getUrls("file://" + ROOT_DIR));
     }
 
     /**
+     * Returns a new instance of the class specified in the benchmark's constructor.
+     *
      * @return a new instance of the class specified in the benchmark's constructor.
-     * @throws ClassNotFoundException
-     * @throws IllegalAccessException
-     * @throws InstantiationException
-     * @throws Exception
+     * @throws ClassNotFoundException if the class can't be found.
+     * @throws ReflectiveOperationException if the class can't be instantiated.
      */
-    public Object newAsmBenchmark()
-        throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+    public Object newAsmBenchmark() throws ClassNotFoundException, ReflectiveOperationException {
       return loadClass(asmBenchmarkClass).newInstance();
     }
 
@@ -161,17 +186,17 @@ public abstract class AbstractBenchmark {
       // This is needed to make sure that the classes it references (i.e. the ASM library classes)
       // will be loaded by this class loader too.
       if (name.startsWith(asmBenchmarkClass)) {
+        byte[] classFile;
         try {
-          byte[] classFile =
-              readInputStream(getResourceAsStream(name.replace('.', '/') + ".class"));
-          Class<?> c = defineClass(name, classFile, 0, classFile.length);
-          if (resolve) {
-            resolveClass(c);
-          }
-          return c;
-        } catch (Exception e) {
+          classFile = readInputStream(getResourceAsStream(name.replace('.', '/') + ".class"));
+        } catch (IOException e) {
           throw new ClassNotFoundException(name, e);
         }
+        Class<?> c = defineClass(name, classFile, 0, classFile.length);
+        if (resolve) {
+          resolveClass(c);
+        }
+        return c;
       }
       // Look for the specified class *first* in asmDirectories, *then* using the parent class
       // loader. This is the reverse of the default lookup order, and is necessary to make sure we

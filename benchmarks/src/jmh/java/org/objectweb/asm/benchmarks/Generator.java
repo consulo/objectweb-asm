@@ -28,13 +28,17 @@
 package org.objectweb.asm.benchmarks;
 
 /**
- * A "Hello World!" class generator.
+ * An abstract "Hello World!" class generator.
  *
  * @author Eric Bruneton
  */
 public abstract class Generator {
 
-  /** @return the version of this generator, or an empty string if there is no version. */
+  /**
+   * Returns the version of this generator.
+   *
+   * @return the version of this generator, or an empty string if there is no version.
+   */
   public String getVersion() {
     return "";
   }

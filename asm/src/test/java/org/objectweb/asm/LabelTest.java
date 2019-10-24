@@ -29,39 +29,45 @@ package org.objectweb.asm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /**
- * Label tests.
+ * Unit tests for {@link Label}.
  *
  * @author Eric Bruneton
  */
 public class LabelTest {
 
-  /** Tests that {@link Label.toString()} returns strings starting with "L". */
-  @Test
-  public void testToString() {
-    assertTrue(new Label().toString().startsWith("L"));
-  }
-
-  /** Tests that {@link Label.getOffset()} returns a correct offset after the label is visited. */
+  /** Tests that {@link Label#getOffset()} returns a correct offset after the label is visited. */
   @Test
   public void testGetOffset() {
-    Label label = new Label();
-    ClassWriter classWriter = new ClassWriter(0);
     MethodVisitor methodVisitor =
-        classWriter.visitMethod(Opcodes.ACC_PUBLIC, "m", "()V", null, null);
+        new ClassWriter(0).visitMethod(Opcodes.ACC_PUBLIC, "m", "()V", null, null);
     methodVisitor.visitCode();
     methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
+    Label label = new Label();
+
     methodVisitor.visitLabel(label);
+
     assertEquals(1, label.getOffset());
   }
 
-  /** Tests that {@link Label.getOffset()} throws an exception before the label is visited. */
+  /** Tests that {@link Label#getOffset()} throws an exception before the label is visited. */
   @Test
   public void testGetOffset_illegalState() {
-    assertThrows(RuntimeException.class, () -> new Label().getOffset());
+    Executable getOffset = () -> new Label().getOffset();
+
+    Exception exception = assertThrows(IllegalStateException.class, getOffset);
+    assertEquals("Label offset position has not been resolved yet", exception.getMessage());
+  }
+
+  /** Tests that {@link Label#toString()} returns strings starting with "L". */
+  @Test
+  public void testToString() {
+    String string = new Label().toString();
+
+    assertEquals('L', string.charAt(0));
   }
 }

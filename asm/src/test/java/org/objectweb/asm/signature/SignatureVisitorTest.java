@@ -27,9 +27,11 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.signature;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * SignatureVisitor tests.
@@ -39,8 +41,10 @@ import org.junit.jupiter.api.Test;
 public class SignatureVisitorTest {
 
   @Test
-  public void testConstuctor() {
-    assertThrows(IllegalArgumentException.class, () -> new SignatureVisitor(0) {});
-    assertThrows(IllegalArgumentException.class, () -> new SignatureVisitor(Integer.MAX_VALUE) {});
+  public void testConstructor_invalidApi() {
+    Executable constructor = () -> new SignatureVisitor(0) {};
+
+    Exception exception = assertThrows(IllegalArgumentException.class, constructor);
+    assertEquals("Unsupported api 0", exception.getMessage());
   }
 }

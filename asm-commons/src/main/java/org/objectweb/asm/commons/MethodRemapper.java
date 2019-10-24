@@ -53,7 +53,7 @@ public class MethodRemapper extends MethodVisitor {
    * @param remapper the remapper to use to remap the types in the visited method.
    */
   public MethodRemapper(final MethodVisitor methodVisitor, final Remapper remapper) {
-    this(Opcodes.ASM6, methodVisitor, remapper);
+    this(Opcodes.ASM7, methodVisitor, remapper);
   }
 
   /**
@@ -111,12 +111,16 @@ public class MethodRemapper extends MethodVisitor {
   @Override
   public void visitFrame(
       final int type,
-      final int nLocal,
+      final int numLocal,
       final Object[] local,
-      final int nStack,
+      final int numStack,
       final Object[] stack) {
     super.visitFrame(
-        type, nLocal, remapFrameTypes(nLocal, local), nStack, remapFrameTypes(nStack, stack));
+        type,
+        numLocal,
+        remapFrameTypes(numLocal, local),
+        numStack,
+        remapFrameTypes(numStack, stack));
   }
 
   private Object[] remapFrameTypes(final int numTypes, final Object[] frameTypes) {
@@ -146,49 +150,24 @@ public class MethodRemapper extends MethodVisitor {
         remapper.mapDesc(descriptor));
   }
 
-  /** @deprecated */
-  @Deprecated
   @Override
   public void visitMethodInsn(
-      final int opcode, final String owner, final String name, final String descriptor) {
-    if (api >= Opcodes.ASM5) {
-      super.visitMethodInsn(opcode, owner, name, descriptor);
-      return;
-    }
-    doVisitMethodInsn(opcode, owner, name, descriptor, opcode == Opcodes.INVOKEINTERFACE);
-  }
-
-  @Override
-  public void visitMethodInsn(
-      final int opcode,
+      final int opcodeAndSource,
       final String owner,
       final String name,
       final String descriptor,
       final boolean isInterface) {
-    if (api < Opcodes.ASM5) {
-      super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+    if (api < Opcodes.ASM5 && (opcodeAndSource & Opcodes.SOURCE_DEPRECATED) == 0) {
+      // Redirect the call to the deprecated version of this method.
+      super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
       return;
     }
-    doVisitMethodInsn(opcode, owner, name, descriptor, isInterface);
-  }
-
-  private void doVisitMethodInsn(
-      final int opcode,
-      final String owner,
-      final String name,
-      final String descriptor,
-      final boolean isInterface) {
-    // Calling super.visitMethodInsn requires to call the correct version depending on this.api
-    // (otherwise infinite loops can occur). To simplify and to make it easier to automatically
-    // remove the backward compatibility code, we inline the code of the overridden method here.
-    if (mv != null) {
-      mv.visitMethodInsn(
-          opcode,
-          remapper.mapType(owner),
-          remapper.mapMethodName(owner, name, descriptor),
-          remapper.mapMethodDesc(descriptor),
-          isInterface);
-    }
+    super.visitMethodInsn(
+        opcodeAndSource,
+        remapper.mapType(owner),
+        remapper.mapMethodName(owner, name, descriptor),
+        remapper.mapMethodDesc(descriptor),
+        isInterface);
   }
 
   @Override

@@ -30,7 +30,6 @@ package org.objectweb.asm.tree.analysis;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -52,7 +51,7 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
    * version.
    */
   public SourceInterpreter() {
-    super(ASM6);
+    super(ASM7);
     if (getClass() != SourceInterpreter.class) {
       throw new IllegalStateException();
     }
@@ -63,7 +62,7 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
    *
    * @param api the ASM API version supported by this interpreter. Must be one of {@link
    *     org.objectweb.asm.Opcodes#ASM4}, {@link org.objectweb.asm.Opcodes#ASM5}, {@link
-   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7_EXPERIMENTAL}.
+   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7}.
    */
   protected SourceInterpreter(final int api) {
     super(api);
@@ -96,6 +95,7 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
         break;
       default:
         size = 1;
+        break;
     }
     return new SourceValue(size, insn);
   }
@@ -124,6 +124,7 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
         break;
       default:
         size = 1;
+        break;
     }
     return new SourceValue(size, insn);
   }
@@ -155,6 +156,7 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
         break;
       default:
         size = 1;
+        break;
     }
     return new SourceValue(size, insn);
   }
@@ -201,12 +203,19 @@ public class SourceInterpreter extends Interpreter<SourceValue> implements Opcod
         return new SourceValue(Math.min(value1.size, value2.size), setUnion);
       }
     }
-    if (value1.size != value2.size || !value1.insns.containsAll(value2.insns)) {
-      HashSet<AbstractInsnNode> setUnion = new HashSet<AbstractInsnNode>();
+    if (value1.size != value2.size || !containsAll(value1.insns, value2.insns)) {
+      HashSet<AbstractInsnNode> setUnion = new HashSet<>();
       setUnion.addAll(value1.insns);
       setUnion.addAll(value2.insns);
       return new SourceValue(Math.min(value1.size, value2.size), setUnion);
     }
     return value1;
+  }
+
+  private static <E> boolean containsAll(final Set<E> self, final Set<E> other) {
+    if (self.size() < other.size()) {
+      return false;
+    }
+    return self.containsAll(other);
   }
 }

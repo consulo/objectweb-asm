@@ -27,20 +27,13 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.tree.analysis;
 
-import java.util.List;
-
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.IntInsnNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MultiANewArrayInsnNode;
-import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.*;
+
+import java.util.List;
 
 /**
  * An {@link Interpreter} for {@link BasicValue} values.
@@ -51,7 +44,7 @@ import org.objectweb.asm.tree.TypeInsnNode;
 public class BasicInterpreter extends Interpreter<BasicValue> implements Opcodes {
 
   /**
-   * Special type used for the <tt>null</tt> literal. This is an object reference type with
+   * Special type used for the {@literal null} literal. This is an object reference type with
    * descriptor 'Lnull;'.
    */
   public static final Type NULL_TYPE = Type.getObjectType("null");
@@ -62,7 +55,7 @@ public class BasicInterpreter extends Interpreter<BasicValue> implements Opcodes
    * version.
    */
   public BasicInterpreter() {
-    super(ASM6);
+    super(ASM7);
     if (getClass() != BasicInterpreter.class) {
       throw new IllegalStateException();
     }
@@ -73,7 +66,7 @@ public class BasicInterpreter extends Interpreter<BasicValue> implements Opcodes
    *
    * @param api the ASM API version supported by this interpreter. Must be one of {@link
    *     org.objectweb.asm.Opcodes#ASM4}, {@link org.objectweb.asm.Opcodes#ASM5}, {@link
-   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7_EXPERIMENTAL}.
+   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7}.
    */
   protected BasicInterpreter(final int api) {
     super(api);
@@ -157,7 +150,7 @@ public class BasicInterpreter extends Interpreter<BasicValue> implements Opcodes
         } else if (value instanceof Handle) {
           return newValue(Type.getObjectType("java/lang/invoke/MethodHandle"));
         } else if (value instanceof ConstantDynamic) {
-          return newValue(Type.getType(((ConstantDynamic)value).getDescriptor()));
+          return newValue(Type.getType(((ConstantDynamic) value).getDescriptor()));
         } else {
           throw new AnalyzerException(insn, "Illegal LDC value " + value);
         }

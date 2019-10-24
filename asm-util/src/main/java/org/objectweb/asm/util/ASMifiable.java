@@ -22,7 +22,6 @@
 package org.objectweb.asm.util;
 
 import java.util.Map;
-
 import org.objectweb.asm.Label;
 
 /**
@@ -30,7 +29,11 @@ import org.objectweb.asm.Label;
  * attribute.
  *
  * @author Eugene Kuleshov
+ * @deprecated This interface is no longer supported (since ASM 7.1), because it uses a StringBuffer
+ *     instead of a StringBuilder. Use {@link ASMifierSupport} instead.
  */
+@Deprecated
+// DontCheck(AbbreviationAsWordInName): can't be renamed (for backward binary compatibility).
 public interface ASMifiable {
 
   /**

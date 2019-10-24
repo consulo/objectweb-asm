@@ -30,8 +30,8 @@ package org.objectweb.asm.commons;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -50,7 +50,7 @@ import org.objectweb.asm.Type;
  * }
  * </pre>
  *
- * can be generated as follows:
+ * <p>can be generated as follows:
  *
  * <pre>
  * ClassWriter cw = new ClassWriter(0);
@@ -183,7 +183,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
   private final Type[] argumentTypes;
 
   /** The types of the local variables of the visited method. */
-  private final List<Type> localTypes = new ArrayList<Type>();
+  private final List<Type> localTypes = new ArrayList<>();
 
   /**
    * Constructs a new {@link GeneratorAdapter}. <i>Subclasses must not use this constructor</i>.
@@ -201,7 +201,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
       final int access,
       final String name,
       final String descriptor) {
-    this(Opcodes.ASM6, methodVisitor, access, name, descriptor);
+    this(Opcodes.ASM7, methodVisitor, access, name, descriptor);
     if (getClass() != GeneratorAdapter.class) {
       throw new IllegalStateException();
     }
@@ -211,7 +211,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    * Constructs a new {@link GeneratorAdapter}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    * @param methodVisitor the method visitor to which this adapter delegates calls.
    * @param access the method's access flags (see {@link Opcodes}).
    * @param name the method's name.
@@ -251,8 +251,8 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    *
    * @param access access flags of the adapted method.
    * @param method the adapted method.
-   * @param signature the signature of the adapted method (may be <tt>null</tt>).
-   * @param exceptions the exceptions thrown by the adapted method (may be <tt>null</tt>).
+   * @param signature the signature of the adapted method (may be {@literal null}).
+   * @param exceptions the exceptions thrown by the adapted method (may be {@literal null}).
    * @param classVisitor the class visitor to which this adapter delegates calls.
    */
   public GeneratorAdapter(
@@ -269,7 +269,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
             method.getName(),
             method.getDescriptor(),
             signature,
-            getInternalNames(exceptions)));
+            exceptions == null ? null : getInternalNames(exceptions)));
   }
 
   /**
@@ -279,9 +279,6 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    * @return the internal names of the given types.
    */
   private static String[] getInternalNames(final Type[] types) {
-    if (types == null) {
-      return null;
-    }
     String[] names = new String[types.length];
     for (int i = 0; i < names.length; ++i) {
       names[i] = types[i].getInternalName();
@@ -379,7 +376,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
   /**
    * Generates the instruction to push the given value on the stack.
    *
-   * @param value the value to be pushed on the stack. May be <tt>null</tt>.
+   * @param value the value to be pushed on the stack. May be {@literal null}.
    */
   public void push(final String value) {
     if (value == null) {
@@ -425,6 +422,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
           break;
         default:
           mv.visitLdcInsn(value);
+          break;
       }
     }
   }
@@ -439,6 +437,19 @@ public class GeneratorAdapter extends LocalVariablesSorter {
       mv.visitInsn(Opcodes.ACONST_NULL);
     } else {
       mv.visitLdcInsn(handle);
+    }
+  }
+
+  /**
+   * Generates the instruction to push a constant dynamic on the stack.
+   *
+   * @param constantDynamic the constant dynamic to be pushed on the stack.
+   */
+  public void push(final ConstantDynamic constantDynamic) {
+    if (constantDynamic == null) {
+      mv.visitInsn(Opcodes.ACONST_NULL);
+    } else {
+      mv.visitLdcInsn(constantDynamic);
     }
   }
 
@@ -741,6 +752,12 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    */
   public void cast(final Type from, final Type to) {
     if (from != to) {
+      if (from.getSort() < Type.BOOLEAN
+          || from.getSort() > Type.DOUBLE
+          || to.getSort() < Type.BOOLEAN
+          || to.getSort() > Type.DOUBLE) {
+        throw new IllegalArgumentException("Cannot cast from " + from + " to " + to);
+      }
       if (from == Type.DOUBLE_TYPE) {
         if (to == Type.FLOAT_TYPE) {
           mv.visitInsn(Opcodes.D2F);
@@ -781,8 +798,6 @@ public class GeneratorAdapter extends LocalVariablesSorter {
           mv.visitInsn(Opcodes.I2L);
         } else if (to == Type.SHORT_TYPE) {
           mv.visitInsn(Opcodes.I2S);
-        } else {
-          throw new IllegalArgumentException();
         }
       }
     }
@@ -898,6 +913,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
         break;
       default:
         unboxMethod = null;
+        break;
     }
     if (unboxMethod == null) {
       checkCast(type);
@@ -946,7 +962,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    *
    * @param type the type of the top two stack values.
    * @param mode how these values must be compared. One of EQ, NE, LT, GE, GT, LE.
-   * @param label where to jump if the comparison result is <tt>true</tt>.
+   * @param label where to jump if the comparison result is {@literal true}.
    */
   public void ifCmp(final Type type, final int mode, final Label label) {
     switch (type.getSort()) {
@@ -1005,7 +1021,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    * stack values.
    *
    * @param mode how these values must be compared. One of EQ, NE, LT, GE, GT, LE.
-   * @param label where to jump if the comparison result is <tt>true</tt>.
+   * @param label where to jump if the comparison result is {@literal true}.
    */
   public void ifICmp(final int mode, final Label label) {
     ifCmp(Type.INT_TYPE, mode, label);
@@ -1016,7 +1032,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    * value with zero.
    *
    * @param mode how these values must be compared. One of EQ, NE, LT, GE, GT, LE.
-   * @param label where to jump if the comparison result is <tt>true</tt>.
+   * @param label where to jump if the comparison result is {@literal true}.
    */
   public void ifZCmp(final int mode, final Label label) {
     mv.visitJumpInsn(mode, label);
@@ -1025,7 +1041,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
   /**
    * Generates the instruction to jump to the given label if the top stack value is null.
    *
-   * @param label where to jump if the condition is <tt>true</tt>.
+   * @param label where to jump if the condition is {@literal true}.
    */
   public void ifNull(final Label label) {
     mv.visitJumpInsn(Opcodes.IFNULL, label);
@@ -1034,7 +1050,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
   /**
    * Generates the instruction to jump to the given label if the top stack value is not null.
    *
-   * @param label where to jump if the condition is <tt>true</tt>.
+   * @param label where to jump if the condition is {@literal true}.
    */
   public void ifNonNull(final Label label) {
     mv.visitJumpInsn(Opcodes.IFNONNULL, label);
@@ -1043,7 +1059,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
   /**
    * Generates the instruction to jump to the given label.
    *
-   * @param label where to jump if the condition is <tt>true</tt>.
+   * @param label where to jump if the condition is {@literal true}.
    */
   public void goTo(final Label label) {
     mv.visitJumpInsn(Opcodes.GOTO, label);
@@ -1080,7 +1096,7 @@ public class GeneratorAdapter extends LocalVariablesSorter {
    *
    * @param keys the switch case keys.
    * @param generator a generator to generate the code for the switch cases.
-   * @param useTable <tt>true</tt> to use a TABLESWITCH instruction, or <tt>false</tt> to use a
+   * @param useTable {@literal true} to use a TABLESWITCH instruction, or {@literal false} to use a
    *     LOOKUPSWITCH instruction.
    */
   public void tableSwitch(

@@ -30,7 +30,6 @@ package org.objectweb.asm.commons;
 
 import java.util.Collections;
 import java.util.Comparator;
-
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.MethodNode;
@@ -50,6 +49,20 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
  */
 public class TryCatchBlockSorter extends MethodNode {
 
+  /**
+   * Constructs a new {@link TryCatchBlockSorter}.
+   *
+   * @param methodVisitor the method visitor to which this visitor must delegate method calls. May
+   *     be {@literal null}.
+   * @param access the method's access flags (see {@link Opcodes}). This parameter also indicates if
+   *     the method is synthetic and/or deprecated.
+   * @param name the method's name.
+   * @param descriptor the method's descriptor (see {@link org.objectweb.asm.Type}).
+   * @param signature the method's signature. May be {@literal null} if the method parameters,
+   *     return type and exceptions do not use generic types.
+   * @param exceptions the internal names of the method's exception classes (see {@link
+   *     org.objectweb.asm.Type#getInternalName()}). May be {@literal null}.
+   */
   public TryCatchBlockSorter(
       final MethodVisitor methodVisitor,
       final int access,
@@ -57,7 +70,7 @@ public class TryCatchBlockSorter extends MethodNode {
       final String descriptor,
       final String signature,
       final String[] exceptions) {
-    this(Opcodes.ASM6, methodVisitor, access, name, descriptor, signature, exceptions);
+    this(Opcodes.ASM7, methodVisitor, access, name, descriptor, signature, exceptions);
     if (getClass() != TryCatchBlockSorter.class) {
       throw new IllegalStateException();
     }
@@ -82,6 +95,7 @@ public class TryCatchBlockSorter extends MethodNode {
         tryCatchBlocks,
         new Comparator<TryCatchBlockNode>() {
 
+          @Override
           public int compare(
               final TryCatchBlockNode tryCatchBlockNode1,
               final TryCatchBlockNode tryCatchBlockNode2) {

@@ -28,7 +28,6 @@
 package org.objectweb.asm.tree;
 
 import java.util.Map;
-
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
@@ -51,6 +50,12 @@ public class LabelNode extends AbstractInsnNode {
     return LABEL;
   }
 
+  /**
+   * Returns the label encapsulated by this node. A new label is created and associated with this
+   * node if it was created without an encapsulated label.
+   *
+   * @return the label encapsulated by this node.
+   */
   public Label getLabel() {
     if (value == null) {
       value = new Label();

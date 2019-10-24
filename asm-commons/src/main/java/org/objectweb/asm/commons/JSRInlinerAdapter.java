@@ -35,7 +35,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -56,6 +55,7 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
  *
  * @author Niko Matsakis
  */
+// DontCheck(AbbreviationAsWordInName): can't be renamed (for backward binary compatibility).
 public class JSRInlinerAdapter extends MethodNode implements Opcodes {
 
   /**
@@ -69,7 +69,7 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
    * instruction, bit i of the corresponding BitSet in this map is set iff instruction at index i
    * belongs to this subroutine.
    */
-  private final Map<LabelNode, BitSet> subroutinesInsns = new HashMap<LabelNode, BitSet>();
+  private final Map<LabelNode, BitSet> subroutinesInsns = new HashMap<>();
 
   /**
    * The instructions that belong to more that one subroutine. Bit i is set iff instruction at index
@@ -87,8 +87,8 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
    * @param access the method's access flags.
    * @param name the method's name.
    * @param descriptor the method's descriptor.
-   * @param signature the method's signature. May be <tt>null</tt>.
-   * @param exceptions the internal names of the method's exception classes. May be <tt>null</tt>.
+   * @param signature the method's signature. May be {@literal null}.
+   * @param exceptions the internal names of the method's exception classes. May be {@literal null}.
    * @throws IllegalStateException if a subclass calls this constructor.
    */
   public JSRInlinerAdapter(
@@ -98,7 +98,7 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
       final String descriptor,
       final String signature,
       final String[] exceptions) {
-    this(Opcodes.ASM6, methodVisitor, access, name, descriptor, signature, exceptions);
+    this(Opcodes.ASM7, methodVisitor, access, name, descriptor, signature, exceptions);
     if (getClass() != JSRInlinerAdapter.class) {
       throw new IllegalStateException();
     }
@@ -108,15 +108,15 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
    * Constructs a new {@link JSRInlinerAdapter}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    * @param methodVisitor the method visitor to send the resulting inlined method code to, or <code>
    *     null</code>.
    * @param access the method's access flags (see {@link Opcodes}). This parameter also indicates if
    *     the method is synthetic and/or deprecated.
    * @param name the method's name.
    * @param descriptor the method's descriptor.
-   * @param signature the method's signature. May be <tt>null</tt>.
-   * @param exceptions the internal names of the method's exception classes. May be <tt>null</tt>.
+   * @param signature the method's signature. May be {@literal null}.
+   * @param exceptions the internal names of the method's exception classes. May be {@literal null}.
    */
   protected JSRInlinerAdapter(
       final int api,
@@ -229,8 +229,6 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
     // method, so we must handle this case here (we could instead detect whether execution can
     // return or not from a JSR, but this is more complicated).
     while (currentInsnIndex < instructions.size()) {
-      AbstractInsnNode currentInsnNode = instructions.get(currentInsnIndex);
-
       // Visit each instruction at most once.
       if (subroutineInsns.get(currentInsnIndex)) {
         return;
@@ -243,6 +241,7 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
       }
       visitedInsns.set(currentInsnIndex);
 
+      AbstractInsnNode currentInsnNode = instructions.get(currentInsnIndex);
       if (currentInsnNode.getType() == AbstractInsnNode.JUMP_INSN
           && currentInsnNode.getOpcode() != JSR) {
         // Don't follow JSR instructions in the control flow graph.
@@ -292,14 +291,14 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
    * fully elaborated.
    */
   private void emitCode() {
-    LinkedList<Instantiation> worklist = new LinkedList<Instantiation>();
+    LinkedList<Instantiation> worklist = new LinkedList<>();
     // Create an instantiation of the main "subroutine", which is just the main routine.
     worklist.add(new Instantiation(null, mainSubroutineInsns));
 
     // Emit instantiations of each subroutine we encounter, including the main subroutine.
     InsnList newInstructions = new InsnList();
-    List<TryCatchBlockNode> newTryCatchBlocks = new ArrayList<TryCatchBlockNode>();
-    List<LocalVariableNode> newLocalVariables = new ArrayList<LocalVariableNode>();
+    List<TryCatchBlockNode> newTryCatchBlocks = new ArrayList<>();
+    List<LocalVariableNode> newLocalVariables = new ArrayList<>();
     while (!worklist.isEmpty()) {
       Instantiation instantiation = worklist.removeFirst();
       emitInstantiation(
@@ -372,8 +371,8 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
           LabelNode clonedJsrLabelNode = newInstantiation.getClonedLabelForJumpInsn(jsrLabelNode);
           // Replace the JSR instruction with a GOTO to the instantiated subroutine, and push NULL
           // for what was once the return address value. This hack allows us to avoid doing any sort
-          // of data flow analysis to figure out which instructions manipulate the old return address
-          // value pointer which is now known to be unneeded.
+          // of data flow analysis to figure out which instructions manipulate the old return
+          // address value pointer which is now known to be unneeded.
           newInstructions.add(new InsnNode(ACONST_NULL));
           newInstructions.add(new JumpInsnNode(GOTO, clonedJsrLabelNode));
           newInstructions.add(newInstantiation.returnLabel);
@@ -420,8 +419,8 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
   private class Instantiation extends AbstractMap<LabelNode, LabelNode> {
 
     /**
-     * The instantiation from which this one was created (or <tt>null</tt> for the instantiation of
-     * the main "subroutine").
+     * The instantiation from which this one was created (or {@literal null} for the instantiation
+     * of the main "subroutine").
      */
     final Instantiation parent;
 
@@ -456,7 +455,7 @@ public class JSRInlinerAdapter extends MethodNode implements Opcodes {
       this.parent = parent;
       this.subroutineInsns = subroutineInsns;
       this.returnLabel = parent == null ? null : new LabelNode();
-      this.clonedLabels = new HashMap<LabelNode, LabelNode>();
+      this.clonedLabels = new HashMap<>();
 
       // Create a clone of each label in the original code of the subroutine. Note that we collapse
       // labels which point at the same instruction into one.

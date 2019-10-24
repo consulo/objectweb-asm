@@ -22,14 +22,16 @@
 package org.objectweb.asm.util;
 
 import java.util.Map;
-
 import org.objectweb.asm.Label;
 
 /**
  * An {@link org.objectweb.asm.Attribute} that can print a readable representation of itself.
  *
  * @author Eugene Kuleshov
+ * @deprecated This interface is no longer supported (since ASM 7.1), because it uses a StringBuffer
+ *     instead of a StringBuilder. Use {@link TextifierSupport} instead.
  */
+@Deprecated
 public interface Textifiable {
 
   /**

@@ -37,7 +37,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
 /**
- * ModuleTargetAttribute tests.
+ * Unit tests for {@link ModuleTargetAttribute}.
  *
  * @author Eric Bruneton
  */
@@ -51,7 +51,7 @@ public class ModuleTargetAttributeTest {
     ModuleTargetAttribute moduleTargetAttribute = new ModuleTargetAttribute();
     new ClassReader(classWriter.toByteArray())
         .accept(
-            new ClassVisitor(Opcodes.ASM6) {
+            new ClassVisitor(Opcodes.ASM7) {
 
               @Override
               public void visitAttribute(final Attribute attribute) {

@@ -29,12 +29,12 @@ package org.objectweb.asm.util;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
@@ -51,6 +51,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SimpleVerifier;
@@ -58,9 +59,9 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
 /**
  * A {@link ClassVisitor} that checks that its methods are properly used. More precisely this class
  * adapter checks each method call individually, based <i>only</i> on its arguments, but does
- * <i>not</i> check the <i>sequence</i> of method calls. For example, the invalid sequence
- * <tt>visitField(ACC_PUBLIC, "i", "I", null)</tt> <tt>visitField(ACC_PUBLIC, "i", "D", null)</tt>
- * will <i>not</i> be detected by this class adapter.
+ * <i>not</i> check the <i>sequence</i> of method calls. For example, the invalid sequence {@code
+ * visitField(ACC_PUBLIC, "i", "I", null)} {@code visitField(ACC_PUBLIC, "i", "D", null)} will
+ * <i>not</i> be detected by this class adapter.
  *
  * <p><code>CheckClassAdapter</code> can be also used to verify bytecode transformations in order to
  * make sure that the transformed bytecode is sane. For example:
@@ -78,12 +79,12 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
  * assertTrue(stringWriter.toString().isEmpty());
  * </pre>
  *
- * The above code pass the transformed bytecode through a <code>CheckClassAdapter</code>, with data
- * flow checks enabled. These checks are not exactly the same as the JVM verification, but provide
- * some basic type checking for each method instruction. If the bytecode has errors, the output text
- * shows the erroneous instruction number, and a dump of the failed method with information about
- * the type of the local variables and of the operand stack slots for each instruction. For example
- * (format is - insnNumber locals : stack):
+ * <p>The above code pass the transformed bytecode through a <code>CheckClassAdapter</code>, with
+ * data flow checks enabled. These checks are not exactly the same as the JVM verification, but
+ * provide some basic type checking for each method instruction. If the bytecode has errors, the
+ * output text shows the erroneous instruction number, and a dump of the failed method with
+ * information about the type of the local variables and of the operand stack slots for each
+ * instruction. For example (format is - insnNumber locals : stack):
  *
  * <pre>
  * org.objectweb.asm.tree.analysis.AnalyzerException: Error at instruction 71: Expected I, but found .
@@ -100,13 +101,18 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
  * ...
  * </pre>
  *
- * The above output shows that the local variable 1, loaded by the <code>ILOAD 1</code> instruction
- * at position <code>00071</code> is not initialized, whereas the local variable 2 is initialized
- * and contains an int value.
+ * <p>The above output shows that the local variable 1, loaded by the <code>ILOAD 1</code>
+ * instruction at position <code>00071</code> is not initialized, whereas the local variable 2 is
+ * initialized and contains an int value.
  *
  * @author Eric Bruneton
  */
 public class CheckClassAdapter extends ClassVisitor {
+
+  /** The help message shown when command line arguments are incorrect. */
+  private static final String USAGE =
+      "Verifies the given class.\n"
+          + "Usage: CheckClassAdapter <fully qualified class name or class file name>";
 
   private static final String ERROR_AT = ": error at index ";
 
@@ -128,12 +134,12 @@ public class CheckClassAdapter extends ClassVisitor {
   /** Whether the {@link #visitOuterClass} method has been called. */
   private boolean visitOuterClassCalled;
 
-  /** Whether the {@link #visitNestHostExperimental} method has been called. */
+  /** Whether the {@link #visitNestHost} method has been called. */
   private boolean visitNestHostCalled;
 
   /**
-   * The common package of all the nest members. Not <tt>null</tt> if the visitNestMember method has
-   * been called.
+   * The common package of all the nest members. Not {@literal null} if the visitNestMember method
+   * has been called.
    */
   private String nestMemberPackageName;
 
@@ -142,147 +148,6 @@ public class CheckClassAdapter extends ClassVisitor {
 
   /** The index of the instruction designated by each visited label so far. */
   private Map<Label, Integer> labelInsnIndices;
-
-  // -----------------------------------------------------------------------------------------------
-  // Static verification methods
-  // -----------------------------------------------------------------------------------------------
-
-  /**
-   * Checks the given class.
-   *
-   * <p>Usage: CheckClassAdapter &lt;binary class name or class file name&gt;
-   *
-   * @param args the command line arguments.
-   * @throws IOException if the class cannot be found, or if an IO exception occurs.
-   */
-  public static void main(final String[] args) throws IOException {
-    if (args.length != 1) {
-      System.err.println(
-          "Verifies the given class.\n"
-              + "Usage: CheckClassAdapter <fully qualified class name or class file name>");
-      return;
-    }
-
-    ClassReader classReader;
-    if (args[0].endsWith(".class")) {
-      classReader = new ClassReader(new FileInputStream(args[0]));
-    } else {
-      classReader = new ClassReader(args[0]);
-    }
-
-    verify(classReader, false, new PrintWriter(System.err));
-  }
-
-  /**
-   * Checks the given class.
-   *
-   * @param classReader the class to be checked.
-   * @param printResults whether to print the results of the bytecode verification.
-   * @param printWriter where the results (or the stack trace in case of error) must be printed.
-   */
-  public static void verify(
-      final ClassReader classReader, final boolean printResults, final PrintWriter printWriter) {
-    verify(classReader, null, printResults, printWriter);
-  }
-
-  /**
-   * Checks the given class.
-   *
-   * @param classReader the class to be checked.
-   * @param loader a <code>ClassLoader</code> which will be used to load referenced classes. May be
-   *     <tt>null</tt>.
-   * @param printResults whether to print the results of the bytecode verification.
-   * @param printWriter where the results (or the stack trace in case of error) must be printed.
-   */
-  public static void verify(
-      final ClassReader classReader,
-      final ClassLoader loader,
-      final boolean printResults,
-      final PrintWriter printWriter) {
-    ClassNode classNode = new ClassNode();
-    classReader.accept(
-        new CheckClassAdapter(Opcodes.ASM7_EXPERIMENTAL, classNode, false) {},
-        ClassReader.SKIP_DEBUG);
-
-    Type syperType = classNode.superName == null ? null : Type.getObjectType(classNode.superName);
-    List<MethodNode> methods = classNode.methods;
-
-    List<Type> interfaces = new ArrayList<Type>();
-    for (String interfaceName : classNode.interfaces) {
-      interfaces.add(Type.getObjectType(interfaceName));
-    }
-
-    for (MethodNode method : methods) {
-      SimpleVerifier verifier =
-          new SimpleVerifier(
-              Type.getObjectType(classNode.name),
-              syperType,
-              interfaces,
-              (classNode.access & Opcodes.ACC_INTERFACE) != 0);
-      Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(verifier);
-      if (loader != null) {
-        verifier.setClassLoader(loader);
-      }
-      try {
-        analyzer.analyze(classNode.name, method);
-      } catch (Exception e) {
-        e.printStackTrace(printWriter);
-      }
-      if (printResults) {
-        printAnalyzerResult(method, analyzer, printWriter);
-      }
-    }
-    printWriter.flush();
-  }
-
-  static void printAnalyzerResult(
-      final MethodNode method, final Analyzer<BasicValue> analyzer, final PrintWriter printWriter) {
-    Textifier textifier = new Textifier();
-    TraceMethodVisitor traceMethodVisitor = new TraceMethodVisitor(textifier);
-
-    printWriter.println(method.name + method.desc);
-    for (int i = 0; i < method.instructions.size(); ++i) {
-      method.instructions.get(i).accept(traceMethodVisitor);
-
-      StringBuilder stringBuilder = new StringBuilder();
-      Frame<BasicValue> frame = analyzer.getFrames()[i];
-      if (frame == null) {
-        stringBuilder.append('?');
-      } else {
-        for (int j = 0; j < frame.getLocals(); ++j) {
-          stringBuilder.append(getUnqualifiedName(frame.getLocal(j).toString())).append(' ');
-        }
-        stringBuilder.append(" : ");
-        for (int j = 0; j < frame.getStackSize(); ++j) {
-          stringBuilder.append(getUnqualifiedName(frame.getStack(j).toString())).append(' ');
-        }
-      }
-      while (stringBuilder.length() < method.maxStack + method.maxLocals + 1) {
-        stringBuilder.append(' ');
-      }
-      printWriter.print(Integer.toString(i + 100000).substring(1));
-      printWriter.print(
-          " " + stringBuilder + " : " + textifier.text.get(textifier.text.size() - 1));
-    }
-    for (TryCatchBlockNode tryCatchBlock : method.tryCatchBlocks) {
-      tryCatchBlock.accept(traceMethodVisitor);
-      printWriter.print(" " + textifier.text.get(textifier.text.size() - 1));
-    }
-    printWriter.println();
-  }
-
-  private static String getUnqualifiedName(final String name) {
-    int lastSlashIndex = name.lastIndexOf('/');
-    if (lastSlashIndex == -1) {
-      return name;
-    } else {
-      int endIndex = name.length();
-      if (name.charAt(endIndex - 1) == ';') {
-        endIndex--;
-      }
-      return name.substring(lastSlashIndex + 1, endIndex);
-    }
-  }
 
   // -----------------------------------------------------------------------------------------------
   // Constructors
@@ -308,7 +173,7 @@ public class CheckClassAdapter extends ClassVisitor {
    * @throws IllegalStateException If a subclass calls this constructor.
    */
   public CheckClassAdapter(final ClassVisitor classVisitor, final boolean checkDataFlow) {
-    this(Opcodes.ASM6, classVisitor, checkDataFlow);
+    this(Opcodes.ASM7, classVisitor, checkDataFlow);
     if (getClass() != CheckClassAdapter.class) {
       throw new IllegalStateException();
     }
@@ -318,17 +183,16 @@ public class CheckClassAdapter extends ClassVisitor {
    * Constructs a new {@link CheckClassAdapter}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link
-   *     Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    * @param classVisitor the class visitor to which this adapter must delegate calls.
-   * @param checkDataFlow <tt>true</tt> to perform basic data flow checks, or <tt>false</tt> to not
-   *     perform any data flow check (see {@link CheckMethodAdapter}). This option requires valid
-   *     maxLocals and maxStack values.
+   * @param checkDataFlow {@literal true} to perform basic data flow checks, or {@literal false} to
+   *     not perform any data flow check (see {@link CheckMethodAdapter}). This option requires
+   *     valid maxLocals and maxStack values.
    */
   protected CheckClassAdapter(
       final int api, final ClassVisitor classVisitor, final boolean checkDataFlow) {
     super(api, classVisitor);
-    this.labelInsnIndices = new HashMap<Label, Integer>();
+    this.labelInsnIndices = new HashMap<>();
     this.checkDataFlow = checkDataFlow;
   }
 
@@ -424,7 +288,7 @@ public class CheckClassAdapter extends ClassVisitor {
   }
 
   @Override
-  public void visitNestHostExperimental(final String nestHost) {
+  public void visitNestHost(final String nestHost) {
     checkState();
     CheckMethodAdapter.checkInternalName(version, nestHost, "nestHost");
     if (visitNestHostCalled) {
@@ -434,11 +298,11 @@ public class CheckClassAdapter extends ClassVisitor {
       throw new IllegalStateException("visitNestHost and visitNestMember are mutually exclusive.");
     }
     visitNestHostCalled = true;
-    super.visitNestHostExperimental(nestHost);
+    super.visitNestHost(nestHost);
   }
 
   @Override
-  public void visitNestMemberExperimental(final String nestMember) {
+  public void visitNestMember(final String nestMember) {
     checkState();
     CheckMethodAdapter.checkInternalName(version, nestMember, "nestMember");
     if (visitNestHostCalled) {
@@ -452,7 +316,7 @@ public class CheckClassAdapter extends ClassVisitor {
       throw new IllegalStateException(
           "nest member " + nestMember + " should be in the package " + nestMemberPackageName);
     }
-    super.visitNestMemberExperimental(nestMember);
+    super.visitNestMember(nestMember);
   }
 
   @Override
@@ -684,7 +548,7 @@ public class CheckClassAdapter extends ClassVisitor {
       CheckMethodAdapter.checkIdentifier(version, name, startIndex, name.length(), null);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          "Invalid " + source + " (must be a fully qualified name): " + name);
+          "Invalid " + source + " (must be a fully qualified name): " + name, e);
     }
   }
 
@@ -1074,5 +938,156 @@ public class CheckClassAdapter extends ClassVisitor {
       return "";
     }
     return name.substring(0, index);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // Static verification methods
+  // -----------------------------------------------------------------------------------------------
+
+  /**
+   * Checks the given class.
+   *
+   * <p>Usage: CheckClassAdapter &lt;binary class name or class file name&gt;
+   *
+   * @param args the command line arguments.
+   * @throws IOException if the class cannot be found, or if an IO exception occurs.
+   */
+  public static void main(final String[] args) throws IOException {
+    main(args, new PrintWriter(System.err, true));
+  }
+
+  /**
+   * Checks the given class.
+   *
+   * @param args the command line arguments.
+   * @param logger where to log errors.
+   * @throws IOException if the class cannot be found, or if an IO exception occurs.
+   */
+  static void main(final String[] args, final PrintWriter logger) throws IOException {
+    if (args.length != 1) {
+      logger.println(USAGE);
+      return;
+    }
+
+    ClassReader classReader;
+    if (args[0].endsWith(".class")) {
+      InputStream inputStream =
+          new FileInputStream(args[0]); // NOPMD(AvoidFileStream): can't fix for 1.5 compatibility
+      classReader = new ClassReader(inputStream);
+    } else {
+      classReader = new ClassReader(args[0]);
+    }
+
+    verify(classReader, false, logger);
+  }
+
+  /**
+   * Checks the given class.
+   *
+   * @param classReader the class to be checked.
+   * @param printResults whether to print the results of the bytecode verification.
+   * @param printWriter where the results (or the stack trace in case of error) must be printed.
+   */
+  public static void verify(
+      final ClassReader classReader, final boolean printResults, final PrintWriter printWriter) {
+    verify(classReader, null, printResults, printWriter);
+  }
+
+  /**
+   * Checks the given class.
+   *
+   * @param classReader the class to be checked.
+   * @param loader a <code>ClassLoader</code> which will be used to load referenced classes. May be
+   *     {@literal null}.
+   * @param printResults whether to print the results of the bytecode verification.
+   * @param printWriter where the results (or the stack trace in case of error) must be printed.
+   */
+  public static void verify(
+      final ClassReader classReader,
+      final ClassLoader loader,
+      final boolean printResults,
+      final PrintWriter printWriter) {
+    ClassNode classNode = new ClassNode();
+    classReader.accept(
+        new CheckClassAdapter(Opcodes.ASM7, classNode, false) {}, ClassReader.SKIP_DEBUG);
+
+    Type syperType = classNode.superName == null ? null : Type.getObjectType(classNode.superName);
+    List<MethodNode> methods = classNode.methods;
+
+    List<Type> interfaces = new ArrayList<>();
+    for (String interfaceName : classNode.interfaces) {
+      interfaces.add(Type.getObjectType(interfaceName));
+    }
+
+    for (MethodNode method : methods) {
+      SimpleVerifier verifier =
+          new SimpleVerifier(
+              Type.getObjectType(classNode.name),
+              syperType,
+              interfaces,
+              (classNode.access & Opcodes.ACC_INTERFACE) != 0);
+      Analyzer<BasicValue> analyzer = new Analyzer<>(verifier);
+      if (loader != null) {
+        verifier.setClassLoader(loader);
+      }
+      try {
+        analyzer.analyze(classNode.name, method);
+      } catch (AnalyzerException e) {
+        e.printStackTrace(printWriter);
+      }
+      if (printResults) {
+        printAnalyzerResult(method, analyzer, printWriter);
+      }
+    }
+    printWriter.flush();
+  }
+
+  static void printAnalyzerResult(
+      final MethodNode method, final Analyzer<BasicValue> analyzer, final PrintWriter printWriter) {
+    Textifier textifier = new Textifier();
+    TraceMethodVisitor traceMethodVisitor = new TraceMethodVisitor(textifier);
+
+    printWriter.println(method.name + method.desc);
+    for (int i = 0; i < method.instructions.size(); ++i) {
+      method.instructions.get(i).accept(traceMethodVisitor);
+
+      StringBuilder stringBuilder = new StringBuilder();
+      Frame<BasicValue> frame = analyzer.getFrames()[i];
+      if (frame == null) {
+        stringBuilder.append('?');
+      } else {
+        for (int j = 0; j < frame.getLocals(); ++j) {
+          stringBuilder.append(getUnqualifiedName(frame.getLocal(j).toString())).append(' ');
+        }
+        stringBuilder.append(" : ");
+        for (int j = 0; j < frame.getStackSize(); ++j) {
+          stringBuilder.append(getUnqualifiedName(frame.getStack(j).toString())).append(' ');
+        }
+      }
+      while (stringBuilder.length() < method.maxStack + method.maxLocals + 1) {
+        stringBuilder.append(' ');
+      }
+      printWriter.print(Integer.toString(i + 100000).substring(1));
+      printWriter.print(
+          " " + stringBuilder + " : " + textifier.text.get(textifier.text.size() - 1));
+    }
+    for (TryCatchBlockNode tryCatchBlock : method.tryCatchBlocks) {
+      tryCatchBlock.accept(traceMethodVisitor);
+      printWriter.print(" " + textifier.text.get(textifier.text.size() - 1));
+    }
+    printWriter.println();
+  }
+
+  private static String getUnqualifiedName(final String name) {
+    int lastSlashIndex = name.lastIndexOf('/');
+    if (lastSlashIndex == -1) {
+      return name;
+    } else {
+      int endIndex = name.length();
+      if (name.charAt(endIndex - 1) == ';') {
+        endIndex--;
+      }
+      return name.substring(lastSlashIndex + 1, endIndex);
+    }
   }
 }

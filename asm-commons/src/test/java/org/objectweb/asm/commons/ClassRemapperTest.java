@@ -27,78 +27,189 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.commons;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.objectweb.asm.test.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
-
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.ConstantDynamic;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.test.AsmTest;
+import org.objectweb.asm.test.ClassFile;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.util.CheckMethodAdapter;
 
 /**
- * ClassRemapper tests.
+ * Unit tests for {@link ClassRemapper}.
  *
  * @author Eric Bruneton
  */
 public class ClassRemapperTest extends AsmTest {
 
   @Test
-  public void testRenameClass() {
+  public void testVisit() {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(classNode, new SimpleRemapper("pkg/C", "new/pkg/C"));
+
     classRemapper.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "pkg/C", null, "java/lang/Object", null);
+
     assertEquals("new/pkg/C", classNode.name);
   }
 
   @Test
-  public void testRenameModuleHashes() {
+  public void testVisitInnerClass() {
+    ClassNode classNode = new ClassNode();
+    ClassRemapper remapper =
+        new ClassRemapper(
+            classNode,
+            new Remapper() {
+              @Override
+              public String map(final String internalName) {
+                if ("pkg/C".equals(internalName)) {
+                  return "a";
+                }
+                if ("pkg/C$Inner".equals(internalName)) {
+                  return "a$b";
+                }
+                return internalName;
+              }
+            });
+    remapper.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "pkg/C", null, "java/lang/Object", null);
+
+    remapper.visitInnerClass("pkg/C$Inner", "pkg/C", "Inner", Opcodes.ACC_PUBLIC);
+
+    assertEquals("a$b", classNode.innerClasses.get(0).name);
+    assertEquals("a", classNode.innerClasses.get(0).outerName);
+    assertEquals("b", classNode.innerClasses.get(0).innerName);
+  }
+
+  @Test
+  public void testVisitInnerClass_localInnerClass() {
+    ClassNode classNode = new ClassNode();
+    ClassRemapper remapper =
+        new ClassRemapper(
+            classNode,
+            new Remapper() {
+              @Override
+              public String map(final String internalName) {
+                if ("pkg/C".equals(internalName)) {
+                  return "a";
+                }
+                if ("pkg/C$1Inner".equals(internalName)) {
+                  return "a$1b";
+                }
+                return internalName;
+              }
+            });
+    remapper.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "pkg/C", null, "java/lang/Object", null);
+
+    remapper.visitInnerClass("pkg/C$1Inner", "pkg/C", "Inner", Opcodes.ACC_PUBLIC);
+
+    assertEquals("a$1b", classNode.innerClasses.get(0).name);
+    assertEquals("a", classNode.innerClasses.get(0).outerName);
+    assertEquals("b", classNode.innerClasses.get(0).innerName);
+  }
+
+  @Test
+  public void testVisitAttribute_moduleHashes() {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(
             classNode,
             new Remapper() {
-
               @Override
-              public String mapModuleName(String name) {
+              public String mapModuleName(final String name) {
                 return "new." + name;
               }
             });
     classRemapper.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
     classRemapper.visitAttribute(
         new ModuleHashesAttribute("algorithm", Arrays.asList("pkg.C"), Arrays.asList(new byte[0])));
+
     assertEquals("C", classNode.name);
     assertEquals("new.pkg.C", ((ModuleHashesAttribute) classNode.attrs.get(0)).modules.get(0));
+  }
+
+  @Test
+  public void testVisitLdcInsn_constantDynamic() {
+    ClassNode classNode = new ClassNode();
+    ClassRemapper classRemapper =
+        new ClassRemapper(
+            Opcodes.ASM7,
+            classNode,
+            new Remapper() {
+              @Override
+              public String mapInvokeDynamicMethodName(final String name, final String descriptor) {
+                return "new." + name;
+              }
+
+              @Override
+              public String map(final String internalName) {
+                if (internalName.equals("java/lang/String")) {
+                  return "java/lang/Integer";
+                }
+                return internalName;
+              }
+            }) {
+          /* inner class so it can access the protected constructor */
+        };
+    classRemapper.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "C", null, "java/lang/Object", null);
+    MethodVisitor methodVisitor =
+        classRemapper.visitMethod(Opcodes.ACC_PUBLIC, "hello", "()V", null, null);
+    methodVisitor.visitCode();
+
+    methodVisitor.visitLdcInsn(
+        new ConstantDynamic(
+            "foo",
+            "Ljava/lang/String;",
+            new Handle(Opcodes.H_INVOKESTATIC, "BSMHost", "bsm", "()Ljava/lang/String;", false)));
+
+    ConstantDynamic constantDynamic =
+        (ConstantDynamic) ((LdcInsnNode) classNode.methods.get(0).instructions.get(0)).cst;
+    assertEquals("new.foo", constantDynamic.getName());
+    assertEquals("Ljava/lang/Integer;", constantDynamic.getDescriptor());
+    assertEquals("()Ljava/lang/Integer;", constantDynamic.getBootstrapMethod().getDesc());
   }
 
   /** Tests that classes transformed with a ClassRemapper can be loaded and instantiated. */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testRemapLoadAndInstantiate(
+  public void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassWriter classWriter = new ClassWriter(0);
     UpperCaseRemapper upperCaseRemapper = new UpperCaseRemapper(classParameter.getInternalName());
-
     ClassRemapper classRemapper =
         new ClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
+
+    Executable accept = () -> classReader.accept(classRemapper, 0);
+
     if (classParameter.isMoreRecentThan(apiParameter)) {
-      assertThrows(RuntimeException.class, () -> classReader.accept(classRemapper, 0));
-      return;
+      Exception exception = assertThrows(UnsupportedOperationException.class, accept);
+      assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+    } else {
+      assertDoesNotThrow(accept);
+      Executable newInstance = () -> new ClassFile(classWriter.toByteArray()).newInstance();
+      if (classParameter.isMoreRecentThanCurrentJdk()) {
+        assertThrows(UnsupportedClassVersionError.class, newInstance);
+      } else {
+        assertDoesNotThrow(newInstance);
+      }
     }
-    classReader.accept(classRemapper, 0);
-    byte[] classFile = classWriter.toByteArray();
-    assertThat(() -> loadAndInstantiate(upperCaseRemapper.getRemappedClassName(), classFile))
-        .succeedsOrThrows(UnsupportedClassVersionError.class)
-        .when(classParameter.isMoreRecentThanCurrentJdk());
   }
 
   /**
@@ -107,27 +218,47 @@ public class ClassRemapperTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testRemapLoadAndInstantiateWithTreeApi(
+  public void testAllMethods_precompiledClass_fromClassNode(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassNode classNode = new ClassNode();
     new ClassReader(classParameter.getBytes()).accept(classNode, 0);
-
     ClassWriter classWriter = new ClassWriter(0);
     UpperCaseRemapper upperCaseRemapper = new UpperCaseRemapper(classParameter.getInternalName());
     ClassRemapper classRemapper =
         new ClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
+
+    Executable accept = () -> classNode.accept(classRemapper);
+
     if (classParameter.isMoreRecentThan(apiParameter)) {
-      assertThrows(RuntimeException.class, () -> classNode.accept(classRemapper));
-      return;
+      Exception exception = assertThrows(UnsupportedOperationException.class, accept);
+      assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+    } else {
+      assertDoesNotThrow(accept);
+      Executable newInstance = () -> new ClassFile(classWriter.toByteArray()).newInstance();
+      if (classParameter.isMoreRecentThanCurrentJdk()) {
+        assertThrows(UnsupportedClassVersionError.class, newInstance);
+      } else {
+        assertDoesNotThrow(newInstance);
+      }
     }
-    classNode.accept(classRemapper);
-    byte[] classFile = classWriter.toByteArray();
-    assertThat(() -> loadAndInstantiate(upperCaseRemapper.getRemappedClassName(), classFile))
-        .succeedsOrThrows(UnsupportedClassVersionError.class)
-        .when(classParameter.isMoreRecentThanCurrentJdk());
+  }
+
+  private static void checkDescriptor(final String descriptor) {
+    CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
+    checkMethodAdapter.visitCode();
+    checkMethodAdapter.visitFieldInsn(Opcodes.GETFIELD, "Owner", "name", descriptor);
+  }
+
+  private static void checkInternalName(final String internalName) {
+    CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
+    checkMethodAdapter.version = Opcodes.V1_5;
+    checkMethodAdapter.visitCode();
+    checkMethodAdapter.visitFieldInsn(Opcodes.GETFIELD, internalName, "name", "I");
   }
 
   static class UpperCaseRemapper extends Remapper {
+
+    private static final Locale LOCALE = Locale.ENGLISH;
 
     private final String internalClassName;
     private final String remappedInternalClassName;
@@ -137,7 +268,7 @@ public class ClassRemapperTest extends AsmTest {
       this.remappedInternalClassName =
           internalClassName.equals("module-info")
               ? internalClassName
-              : internalClassName.toUpperCase();
+              : internalClassName.toUpperCase(LOCALE);
     }
 
     String getRemappedClassName() {
@@ -163,34 +294,43 @@ public class ClassRemapperTest extends AsmTest {
       if (name.equals("<init>") || name.equals("<clinit>")) {
         return name;
       }
-      return owner.equals(internalClassName) ? name.toUpperCase() : name;
+      return owner.equals(internalClassName) ? name.toUpperCase(LOCALE) : name;
     }
 
     @Override
     public String mapInvokeDynamicMethodName(final String name, final String descriptor) {
-      return name.toUpperCase();
+      return name.toUpperCase(LOCALE);
     }
 
     @Override
     public String mapFieldName(final String owner, final String name, final String descriptor) {
-      return owner.equals(internalClassName) ? name.toUpperCase() : name;
+      return owner.equals(internalClassName) ? name.toUpperCase(LOCALE) : name;
     }
 
     @Override
     public String map(final String typeName) {
       return typeName.equals(internalClassName) ? remappedInternalClassName : typeName;
     }
-  }
 
-  private static void checkDescriptor(final String descriptor) {
-    CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
-    checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitFieldInsn(Opcodes.GETFIELD, "Owner", "name", descriptor);
-  }
-
-  private static void checkInternalName(final String internalName) {
-    CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
-    checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitFieldInsn(Opcodes.GETFIELD, internalName, "name", "I");
+    @Override
+    public Object mapValue(final Object value) {
+      if (value instanceof Boolean
+          || value instanceof Byte
+          || value instanceof Short
+          || value instanceof Character
+          || value instanceof Integer
+          || value instanceof Long
+          || value instanceof Double
+          || value instanceof Float
+          || value instanceof String
+          || value instanceof Type
+          || value instanceof Handle
+          || value instanceof ConstantDynamic
+          || value.getClass().isArray()) {
+        return super.mapValue(value);
+      }
+      // If this happens, add support for the new type in Remapper.mapValue(), if needed.
+      throw new IllegalArgumentException("Unsupported type of value: " + value);
+    }
   }
 }

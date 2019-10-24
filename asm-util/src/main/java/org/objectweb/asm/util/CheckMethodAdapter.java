@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ConstantDynamic;
@@ -59,7 +58,7 @@ import org.objectweb.asm.tree.analysis.BasicVerifier;
  * correct for a given visit method. This adapter can also perform some basic data flow checks (more
  * precisely those that can be performed without the full class hierarchy - see {@link
  * org.objectweb.asm.tree.analysis.BasicVerifier}). For instance in a method whose signature is
- * <tt>void m ()</tt>, the invalid instruction IRETURN, or the invalid sequence IADD L2I will be
+ * {@code void m ()}, the invalid instruction IRETURN, or the invalid sequence IADD L2I will be
  * detected if the data flow checks are enabled. These checks are enabled by using the {@link
  * #CheckMethodAdapter(int,String,String,MethodVisitor,Map)} constructor. They are not performed if
  * any other constructor is used.
@@ -367,7 +366,7 @@ public class CheckMethodAdapter extends MethodVisitor {
    */
   public CheckMethodAdapter(
       final MethodVisitor methodVisitor, final Map<Label, Integer> labelInsnIndices) {
-    this(Opcodes.ASM6, methodVisitor, labelInsnIndices);
+    this(Opcodes.ASM7, methodVisitor, labelInsnIndices);
     if (getClass() != CheckMethodAdapter.class) {
       throw new IllegalStateException();
     }
@@ -378,7 +377,7 @@ public class CheckMethodAdapter extends MethodVisitor {
    * data flow check (see {@link #CheckMethodAdapter(int,String,String,MethodVisitor,Map)}).
    *
    * @param api the ASM API version implemented by this CheckMethodAdapter. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    * @param methodVisitor the method visitor to which this adapter must delegate calls.
    * @param labelInsnIndices the index of the instruction designated by each visited label so far
    *     (in other methods). This map is updated with the labels from the visited method.
@@ -389,13 +388,13 @@ public class CheckMethodAdapter extends MethodVisitor {
       final Map<Label, Integer> labelInsnIndices) {
     super(api, methodVisitor);
     this.labelInsnIndices = labelInsnIndices;
-    this.referencedLabels = new HashSet<Label>();
-    this.handlers = new ArrayList<Label>();
+    this.referencedLabels = new HashSet<>();
+    this.handlers = new ArrayList<>();
   }
 
   /**
    * Constructs a new {@link CheckMethodAdapter} object. This method adapter will perform basic data
-   * flow checks. For instance in a method whose signature is <tt>void m ()</tt>, the invalid
+   * flow checks. For instance in a method whose signature is {@code void m ()}, the invalid
    * instruction IRETURN, or the invalid sequence IADD L2I will be detected. <i>Subclasses must not
    * use this constructor</i>. Instead, they must use the {@link
    * #CheckMethodAdapter(int,int,String,String,MethodVisitor,Map)} version.
@@ -413,7 +412,7 @@ public class CheckMethodAdapter extends MethodVisitor {
       final String descriptor,
       final MethodVisitor methodVisitor,
       final Map<Label, Integer> labelInsnIndices) {
-    this(Opcodes.ASM6, access, name, descriptor, methodVisitor, labelInsnIndices);
+    this(Opcodes.ASM7, access, name, descriptor, methodVisitor, labelInsnIndices);
     if (getClass() != CheckMethodAdapter.class) {
       throw new IllegalStateException();
     }
@@ -421,11 +420,11 @@ public class CheckMethodAdapter extends MethodVisitor {
 
   /**
    * Constructs a new {@link CheckMethodAdapter} object. This method adapter will perform basic data
-   * flow checks. For instance in a method whose signature is <tt>void m ()</tt>, the invalid
+   * flow checks. For instance in a method whose signature is {@code void m ()}, the invalid
    * instruction IRETURN, or the invalid sequence IADD L2I will be detected.
    *
    * @param api the ASM API version implemented by this CheckMethodAdapter. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    * @param access the method's access flags.
    * @param name the method's name.
    * @param descriptor the method's descriptor (see {@link Type}).
@@ -445,19 +444,22 @@ public class CheckMethodAdapter extends MethodVisitor {
         new MethodNode(api, access, name, descriptor, null, null) {
           @Override
           public void visitEnd() {
-            Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(new BasicVerifier());
+            Analyzer<BasicValue> analyzer = new Analyzer<>(new BasicVerifier());
             try {
               analyzer.analyze("dummy", this);
             } catch (IndexOutOfBoundsException e) {
               if (maxLocals == 0 && maxStack == 0) {
                 throw new IllegalArgumentException(
-                    "Data flow checking option requires valid, non zero maxLocals and maxStack.");
+                    "Data flow checking option requires valid, non zero maxLocals and maxStack.",
+                    e);
               }
               throwError(analyzer, e);
             } catch (AnalyzerException e) {
               throwError(analyzer, e);
             }
-            accept(methodVisitor);
+            if (methodVisitor != null) {
+              accept(methodVisitor);
+            }
           }
 
           private void throwError(final Analyzer<BasicValue> analyzer, final Exception e) {
@@ -563,62 +565,64 @@ public class CheckMethodAdapter extends MethodVisitor {
   @Override
   public void visitFrame(
       final int type,
-      final int nLocal,
+      final int numLocal,
       final Object[] local,
-      final int nStack,
+      final int numStack,
       final Object[] stack) {
     if (insnCount == lastFrameInsnIndex) {
       throw new IllegalStateException("At most one frame can be visited at a given code location.");
     }
     lastFrameInsnIndex = insnCount;
-    int mLocal;
-    int mStack;
+    int maxNumLocal;
+    int maxNumStack;
     switch (type) {
       case Opcodes.F_NEW:
       case Opcodes.F_FULL:
-        mLocal = Integer.MAX_VALUE;
-        mStack = Integer.MAX_VALUE;
+        maxNumLocal = Integer.MAX_VALUE;
+        maxNumStack = Integer.MAX_VALUE;
         break;
 
       case Opcodes.F_SAME:
-        mLocal = 0;
-        mStack = 0;
+        maxNumLocal = 0;
+        maxNumStack = 0;
         break;
 
       case Opcodes.F_SAME1:
-        mLocal = 0;
-        mStack = 1;
+        maxNumLocal = 0;
+        maxNumStack = 1;
         break;
 
       case Opcodes.F_APPEND:
       case Opcodes.F_CHOP:
-        mLocal = 3;
-        mStack = 0;
+        maxNumLocal = 3;
+        maxNumStack = 0;
         break;
 
       default:
         throw new IllegalArgumentException("Invalid frame type " + type);
     }
 
-    if (nLocal > mLocal) {
-      throw new IllegalArgumentException("Invalid nLocal=" + nLocal + " for frame type " + type);
+    if (numLocal > maxNumLocal) {
+      throw new IllegalArgumentException(
+          "Invalid numLocal=" + numLocal + " for frame type " + type);
     }
-    if (nStack > mStack) {
-      throw new IllegalArgumentException("Invalid nStack=" + nStack + " for frame type " + type);
+    if (numStack > maxNumStack) {
+      throw new IllegalArgumentException(
+          "Invalid numStack=" + numStack + " for frame type " + type);
     }
 
     if (type != Opcodes.F_CHOP) {
-      if (nLocal > 0 && (local == null || local.length < nLocal)) {
-        throw new IllegalArgumentException("Array local[] is shorter than nLocal");
+      if (numLocal > 0 && (local == null || local.length < numLocal)) {
+        throw new IllegalArgumentException("Array local[] is shorter than numLocal");
       }
-      for (int i = 0; i < nLocal; ++i) {
+      for (int i = 0; i < numLocal; ++i) {
         checkFrameValue(local[i]);
       }
     }
-    if (nStack > 0 && (stack == null || stack.length < nStack)) {
-      throw new IllegalArgumentException("Array stack[] is shorter than nStack");
+    if (numStack > 0 && (stack == null || stack.length < numStack)) {
+      throw new IllegalArgumentException("Array stack[] is shorter than numStack");
     }
-    for (int i = 0; i < nStack; ++i) {
+    for (int i = 0; i < numStack; ++i) {
       checkFrameValue(stack[i]);
     }
     if (type == Opcodes.F_NEW) {
@@ -629,7 +633,7 @@ public class CheckMethodAdapter extends MethodVisitor {
     if (numExpandedFrames > 0 && numCompressedFrames > 0) {
       throw new IllegalArgumentException("Expanded and compressed frames must not be mixed.");
     }
-    super.visitFrame(type, nLocal, local, nStack, stack);
+    super.visitFrame(type, numLocal, local, numStack, stack);
   }
 
   @Override
@@ -702,38 +706,20 @@ public class CheckMethodAdapter extends MethodVisitor {
     ++insnCount;
   }
 
-  /** @deprecated */
-  @Deprecated
   @Override
   public void visitMethodInsn(
-      final int opcode, final String owner, final String name, final String descriptor) {
-    if (api >= Opcodes.ASM5) {
-      super.visitMethodInsn(opcode, owner, name, descriptor);
-      return;
-    }
-    doVisitMethodInsn(opcode, owner, name, descriptor, opcode == Opcodes.INVOKEINTERFACE);
-  }
-
-  @Override
-  public void visitMethodInsn(
-      final int opcode,
+      final int opcodeAndSource,
       final String owner,
       final String name,
       final String descriptor,
       final boolean isInterface) {
-    if (api < Opcodes.ASM5) {
-      super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+    if (api < Opcodes.ASM5 && (opcodeAndSource & Opcodes.SOURCE_DEPRECATED) == 0) {
+      // Redirect the call to the deprecated version of this method.
+      super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
       return;
     }
-    doVisitMethodInsn(opcode, owner, name, descriptor, isInterface);
-  }
+    int opcode = opcodeAndSource & ~Opcodes.SOURCE_MASK;
 
-  private void doVisitMethodInsn(
-      final int opcode,
-      final String owner,
-      final String name,
-      final String descriptor,
-      final boolean isInterface) {
     checkVisitCodeCalled();
     checkVisitMaxsNotCalled();
     checkOpcodeMethod(opcode, Method.VISIT_METHOD_INSN);
@@ -752,13 +738,7 @@ public class CheckMethodAdapter extends MethodVisitor {
       throw new IllegalArgumentException(
           "INVOKESPECIAL can't be used with interfaces prior to Java 8");
     }
-
-    // Calling super.visitMethodInsn requires to call the correct version depending on this.api
-    // (otherwise infinite loops can occur). To simplify and to make it easier to automatically
-    // remove the backward compatibility code, we inline the code of the overridden method here.
-    if (mv != null) {
-      mv.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-    }
+    super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
     ++insnCount;
   }
 
@@ -842,8 +822,8 @@ public class CheckMethodAdapter extends MethodVisitor {
       checkLabel(labels[i], false, "label at index " + i);
     }
     super.visitTableSwitchInsn(min, max, dflt, labels);
-    for (int i = 0; i < labels.length; ++i) {
-      referencedLabels.add(labels[i]);
+    for (Label label : labels) {
+      referencedLabels.add(label);
     }
     ++insnCount;
   }
@@ -861,8 +841,8 @@ public class CheckMethodAdapter extends MethodVisitor {
     }
     super.visitLookupSwitchInsn(dflt, keys, labels);
     referencedLabels.add(dflt);
-    for (int i = 0; i < labels.length; ++i) {
-      referencedLabels.add(labels[i]);
+    for (Label label : labels) {
+      referencedLabels.add(label);
     }
     ++insnCount;
   }
@@ -960,6 +940,9 @@ public class CheckMethodAdapter extends MethodVisitor {
     checkVisitMaxsNotCalled();
     checkUnqualifiedName(version, name, "name");
     checkDescriptor(version, descriptor, false);
+    if (signature != null) {
+      CheckClassAdapter.checkFieldSignature(signature);
+    }
     checkLabel(start, true, START_LABEL);
     checkLabel(end, true, END_LABEL);
     checkUnsignedShort(index, INVALID_LOCAL_VARIABLE_INDEX);
@@ -1198,7 +1181,10 @@ public class CheckMethodAdapter extends MethodVisitor {
       } else {
         checkMethodDescriptor(this.version, handle.getDesc());
       }
-      checkMethodIdentifier(this.version, handle.getName(), "handle name");
+      String handleName = handle.getName();
+      if (!("<init>".equals(handleName) && tag == Opcodes.H_NEWINVOKESPECIAL)) {
+        checkMethodIdentifier(this.version, handleName, "handle name");
+      }
     } else if (value instanceof ConstantDynamic) {
       if ((version & 0xFFFF) < Opcodes.V11) {
         throw new IllegalArgumentException("ldc of a ConstantDynamic requires at least version 11");
@@ -1207,8 +1193,9 @@ public class CheckMethodAdapter extends MethodVisitor {
       checkMethodIdentifier(this.version, constantDynamic.getName(), "constant dynamic name");
       checkDescriptor(this.version, constantDynamic.getDescriptor(), false);
       checkLdcConstant(constantDynamic.getBootstrapMethod());
-      for (Object bootstrapArgument : constantDynamic.getBootstrapMethodArguments()) {
-        checkLdcConstant(bootstrapArgument);
+      int bootstrapMethodArgumentCount = constantDynamic.getBootstrapMethodArgumentCount();
+      for (int i = 0; i < bootstrapMethodArgumentCount; ++i) {
+        checkLdcConstant(constantDynamic.getBootstrapMethodArgument(i));
       }
     } else {
       checkConstant(value);
@@ -1233,7 +1220,7 @@ public class CheckMethodAdapter extends MethodVisitor {
    * @param name the string to be checked.
    * @param startPos the index of the first character of the identifier (inclusive).
    * @param endPos the index of the last character of the identifier (exclusive). -1 is equivalent
-   *     to <tt>name.length()</tt> if name is not <tt>null</tt>.
+   *     to {@code name.length()} if name is not {@literal null}.
    * @param message the message to use in case of error.
    */
   static void checkIdentifier(
@@ -1329,13 +1316,13 @@ public class CheckMethodAdapter extends MethodVisitor {
       int startIndex = 0;
       int slashIndex;
       while ((slashIndex = name.indexOf('/', startIndex + 1)) != -1) {
-        CheckMethodAdapter.checkIdentifier(version, name, startIndex, slashIndex, null);
+        checkIdentifier(version, name, startIndex, slashIndex, null);
         startIndex = slashIndex + 1;
       }
-      CheckMethodAdapter.checkIdentifier(version, name, startIndex, name.length(), null);
+      checkIdentifier(version, name, startIndex, name.length(), null);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          INVALID + message + " (must be an internal class name): " + name);
+          INVALID + message + " (must be an internal class name): " + name, e);
     }
   }
 
@@ -1344,7 +1331,7 @@ public class CheckMethodAdapter extends MethodVisitor {
    *
    * @param version the class version.
    * @param descriptor the string to be checked.
-   * @param canBeVoid <tt>true</tt> if <tt>V</tt> can be considered valid.
+   * @param canBeVoid {@literal true} if {@code V} can be considered valid.
    */
   static void checkDescriptor(final int version, final String descriptor, final boolean canBeVoid) {
     int endPos = checkDescriptor(version, descriptor, 0, canBeVoid);
@@ -1359,7 +1346,7 @@ public class CheckMethodAdapter extends MethodVisitor {
    * @param version the class version.
    * @param descriptor the string to be checked.
    * @param startPos the index of the first character of the type descriptor (inclusive).
-   * @param canBeVoid whether <tt>V</tt> can be considered valid.
+   * @param canBeVoid whether {@code V} can be considered valid.
    * @return the index of the last character of the type descriptor, plus one.
    */
   private static int checkDescriptor(
@@ -1400,8 +1387,8 @@ public class CheckMethodAdapter extends MethodVisitor {
         }
         try {
           checkInternalClassName(version, descriptor.substring(startPos + 1, endPos), null);
-        } catch (IllegalArgumentException unused) {
-          throw new IllegalArgumentException(INVALID_DESCRIPTOR + descriptor);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(INVALID_DESCRIPTOR + descriptor, e);
         }
         return endPos + 1;
       default:

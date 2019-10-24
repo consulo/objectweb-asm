@@ -27,12 +27,13 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.commons;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.objectweb.asm.test.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,9 +46,10 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.test.AsmTest;
+import org.objectweb.asm.test.ClassFile;
 
 /**
- * AnalyzerAdapter tests.
+ * Unit tests for {@link AnalyzerAdapter}.
  *
  * @author Eric Bruneton
  */
@@ -55,20 +57,34 @@ public class AnalyzerAdapterTest extends AsmTest {
 
   @Test
   public void testConstructor() {
-    new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null);
+    assertDoesNotThrow(
+        () -> new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null));
     assertThrows(
         IllegalStateException.class,
         () -> new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null) {});
   }
 
   @Test
-  public void testVisitFrame() {
+  public void testVisitFrame_emptyFrame() {
     AnalyzerAdapter analyzerAdapter =
         new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null);
-    analyzerAdapter.visitFrame(Opcodes.F_NEW, 0, null, 0, null);
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> analyzerAdapter.visitFrame(Opcodes.F_FULL, 0, null, 0, null));
+
+    Executable visitFrame = () -> analyzerAdapter.visitFrame(Opcodes.F_NEW, 0, null, 0, null);
+
+    assertDoesNotThrow(visitFrame);
+  }
+
+  @Test
+  public void testVisitFrame_invalidFrameType() {
+    AnalyzerAdapter analyzerAdapter =
+        new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null);
+
+    Executable visitFrame = () -> analyzerAdapter.visitFrame(Opcodes.F_FULL, 0, null, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals(
+        "AnalyzerAdapter only accepts expanded frames (see ClassReader.EXPAND_FRAMES)",
+        exception.getMessage());
   }
 
   /**
@@ -78,66 +94,80 @@ public class AnalyzerAdapterTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAnalyzeLoadAndInstantiate(
+  public void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) throws Exception {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
     ClassWriter classWriter = new ClassWriter(0);
-    ClassVisitor classVisitor =
-        new ClassVisitor(apiParameter.value(), classWriter) {
+    ClassVisitor classAnalyzerAdapter = new ClassAnalyzerAdapter(apiParameter.value(), classWriter);
 
-          private String owner;
+    Executable accept = () -> classReader.accept(classAnalyzerAdapter, ClassReader.EXPAND_FRAMES);
 
-          @Override
-          public void visit(
-              final int version,
-              final int access,
-              final String name,
-              final String signature,
-              final String superName,
-              final String[] interfaces) {
-            owner = name;
-            super.visit(version, access, name, signature, superName, interfaces);
-          }
-
-          @Override
-          public MethodVisitor visitMethod(
-              final int access,
-              final String name,
-              final String descriptor,
-              final String signature,
-              final String[] exceptions) {
-            MethodVisitor methodVisitor =
-                super.visitMethod(access, name, descriptor, signature, exceptions);
-            AnalyzedFramesInserter inserter = new AnalyzedFramesInserter(methodVisitor);
-            AnalyzerAdapter analyzerAdapter =
-                new AnalyzerAdapter(api, owner, access, name, descriptor, inserter) {
-
-                  @Override
-                  public void visitMaxs(final int maxStack, final int maxLocals) {
-                    // AnalyzerAdapter should correctly recompute maxLocals from scratch.
-                    super.visitMaxs(maxStack, 0);
-                  }
-                };
-            inserter.setAnalyzerAdapter(analyzerAdapter);
-            return analyzerAdapter;
-          }
-        };
-    Executable test =
-        () -> {
-          classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES);
-          loadAndInstantiate(classParameter.getName(), classWriter.toByteArray());
-        };
-    // jdk3.AllInstructions and jdk3.LargeMethod contain jsr/ret instructions,
-    // which are not supported.
+    // jdk3.AllInstructions and jdk3.LargeMethod contain unsupported jsr/ret instructions.
     if (classParameter == PrecompiledClass.JDK3_ALL_INSTRUCTIONS
-        || classParameter == PrecompiledClass.JDK3_LARGE_METHOD
-        || classParameter.isMoreRecentThan(apiParameter)) {
-      assertThrows(RuntimeException.class, test);
+        || classParameter == PrecompiledClass.JDK3_LARGE_METHOD) {
+      Exception exception = assertThrows(IllegalArgumentException.class, accept);
+      assertEquals("JSR/RET are not supported", exception.getMessage());
+    } else if (classParameter.isMoreRecentThan(apiParameter)) {
+      Exception exception = assertThrows(UnsupportedOperationException.class, accept);
+      assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
     } else {
-      assertThat(test)
-          .succeedsOrThrows(UnsupportedClassVersionError.class)
-          .when(classParameter.isMoreRecentThanCurrentJdk());
+      assertDoesNotThrow(accept);
+      Executable newInstance = () -> new ClassFile(classWriter.toByteArray()).newInstance();
+      if (classParameter.isMoreRecentThanCurrentJdk()) {
+        assertThrows(UnsupportedClassVersionError.class, newInstance);
+      } else {
+        assertDoesNotThrow(newInstance);
+      }
+    }
+  }
+
+  /**
+   * A ClassVisitor that inserts intermediate frames before each instruction of each method, using
+   * the types computed with an AnalyzerAdapter (in order to check that these intermediate frames
+   * are correct).
+   */
+  static class ClassAnalyzerAdapter extends ClassVisitor {
+
+    private String owner;
+
+    ClassAnalyzerAdapter(final int api, final ClassVisitor classVisitor) {
+      super(api, classVisitor);
+    }
+
+    @Override
+    public void visit(
+        final int version,
+        final int access,
+        final String name,
+        final String signature,
+        final String superName,
+        final String[] interfaces) {
+      owner = name;
+      super.visit(version, access, name, signature, superName, interfaces);
+    }
+
+    @Override
+    public MethodVisitor visitMethod(
+        final int access,
+        final String name,
+        final String descriptor,
+        final String signature,
+        final String[] exceptions) {
+      MethodVisitor methodVisitor =
+          super.visitMethod(access, name, descriptor, signature, exceptions);
+      AnalyzedFramesInserter inserter = new AnalyzedFramesInserter(methodVisitor);
+      AnalyzerAdapter analyzerAdapter =
+          new AnalyzerAdapter(api, owner, access, name, descriptor, inserter) {
+
+            @Override
+            public void visitMaxs(final int maxStack, final int maxLocals) {
+              // AnalyzerAdapter should correctly recompute maxLocals from scratch.
+              super.visitMaxs(maxStack, 0);
+            }
+          };
+      inserter.setAnalyzerAdapter(analyzerAdapter);
+      return analyzerAdapter;
     }
   }
 
@@ -151,7 +181,7 @@ public class AnalyzerAdapterTest extends AsmTest {
     private boolean hasOriginalFrame;
 
     AnalyzedFramesInserter(final MethodVisitor methodVisitor) {
-      super(Opcodes.ASM7_EXPERIMENTAL, methodVisitor);
+      super(Opcodes.ASM7, methodVisitor);
     }
 
     void setAnalyzerAdapter(final AnalyzerAdapter analyzerAdapter) {
@@ -161,11 +191,11 @@ public class AnalyzerAdapterTest extends AsmTest {
     @Override
     public void visitFrame(
         final int type,
-        final int nLocal,
+        final int numLocal,
         final Object[] local,
-        final int nStack,
+        final int numStack,
         final Object[] stack) {
-      super.visitFrame(type, nLocal, local, nStack, stack);
+      super.visitFrame(type, numLocal, local, numStack, stack);
       hasOriginalFrame = true;
     }
 
@@ -187,13 +217,11 @@ public class AnalyzerAdapterTest extends AsmTest {
      * represented with one element in visitFrame, but with two elements in AnalyzerAdapter).
      */
     private ArrayList<Object> toFrameTypes(final List<Object> analyzerTypes) {
-      ArrayList<Object> frameTypes = new ArrayList<Object>();
-      for (int i = 0; i < analyzerTypes.size(); ++i) {
+      ArrayList<Object> frameTypes = new ArrayList<>();
+      for (int i = 0; i < analyzerTypes.size(); ) {
         Object value = analyzerTypes.get(i);
         frameTypes.add(value);
-        if (value == Opcodes.LONG || value == Opcodes.DOUBLE) {
-          ++i;
-        }
+        i += (value == Opcodes.LONG || value == Opcodes.DOUBLE) ? 2 : 1;
       }
       return frameTypes;
     }

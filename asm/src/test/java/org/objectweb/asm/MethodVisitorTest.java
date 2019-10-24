@@ -27,133 +27,370 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.StringWriter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.objectweb.asm.test.AsmTest;
 
 /**
- * MethodVisitor tests.
+ * Unit tests for {@link MethodVisitor}.
  *
  * @author Eric Bruneton
  */
-public class MethodVisitorTest {
+public class MethodVisitorTest extends AsmTest {
 
   @Test
-  public void testConstuctor() {
-    assertThrows(IllegalArgumentException.class, () -> new MethodVisitor(0) {});
-    assertThrows(IllegalArgumentException.class, () -> new MethodVisitor(Integer.MAX_VALUE) {});
+  public void testConstructor_validApi() {
+    Executable constructor = () -> new MethodVisitor(Opcodes.ASM4) {};
+
+    assertDoesNotThrow(constructor);
   }
 
   @Test
-  public void testAsm5Features() {
+  public void testConstructor_invalidApi() {
+    Executable constructor = () -> new MethodVisitor(0) {};
+
+    Exception exception = assertThrows(IllegalArgumentException.class, constructor);
+    assertEquals("Unsupported api 0", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitParameter_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
-    assertThrows(UnsupportedOperationException.class, () -> methodVisitor.visitParameter(null, 0));
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> methodVisitor.visitTypeAnnotation(0, null, null, false));
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> methodVisitor.visitInvokeDynamicInsn(null, null, null));
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> methodVisitor.visitInsnAnnotation(0, null, null, false));
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> methodVisitor.visitTryCatchAnnotation(0, null, null, false));
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> methodVisitor.visitLocalVariableAnnotation(0, null, null, null, null, null, false));
+
+    Executable visitParameter = () -> methodVisitor.visitParameter(null, 0);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitParameter);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /**
-   * Tests that we can call the ASM5 visitMethodInsn on an ASM4 visitor, provided isInterface is
-   * false.
-   */
   @Test
-  public void testBackwardCompatibilityOk() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor4(checkMethodVisitor);
-    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
-    assertEquals("m", checkMethodVisitor.lastVisitedMethodName);
+  public void testVisitTypeAnnotation_asm4Visitor() {
+    MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
+
+    Executable visitTypeAnnotation = () -> methodVisitor.visitTypeAnnotation(0, null, null, false);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitTypeAnnotation);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /** Tests the ASM5 visitMethodInsn fails on an ASM4 visitor, if isInterface is true. */
   @Test
-  public void testBackwardCompatibilityFail() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor4(checkMethodVisitor);
-    assertThrows(
-        RuntimeException.class, () -> methodVisitor.visitMethodInsn(0, "C", "m", "()V", true));
+  public void testVisitInvokeDynamicInsn_asm4Visitor() {
+    MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
+
+    Executable visitInvokeDynamicInsn =
+        () -> methodVisitor.visitInvokeDynamicInsn(null, null, null);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitInvokeDynamicInsn);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /**
-   * Tests that the ASM5 visitMethodInsn of an ASM4 visitor delegates calls to the ASM4
-   * visitMethodInsn, provided isInterface is false.
-   */
   @Test
-  public void testBackwardCompatibilityOverride() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor4Override(checkMethodVisitor);
-    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
-    assertEquals("mv4", checkMethodVisitor.lastVisitedMethodName);
+  public void testVisitInsnAnnotation_asm4Visitor() {
+    MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
+
+    Executable visitInsnAnnotation = () -> methodVisitor.visitInsnAnnotation(0, null, null, false);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitInsnAnnotation);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /** Tests the ASM5 visitMethodInsn fails on an ASM4 visitor, if isInterface is true. */
   @Test
-  public void testBackwardCompatibilityOverrideFail() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor4Override(checkMethodVisitor);
-    assertThrows(
-        RuntimeException.class, () -> methodVisitor.visitMethodInsn(0, "C", "m", "()V", true));
+  public void testVisitTryCatchAnnotation_asm4Visitor() {
+    MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
+
+    Executable visitTryCatchAnnotation =
+        () -> methodVisitor.visitTryCatchAnnotation(0, null, null, false);
+
+    Exception exception =
+        assertThrows(UnsupportedOperationException.class, visitTryCatchAnnotation);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /** Tests the ASM5 visitMethodInsn succeeds on an ASM5 visitor. */
   @Test
-  public void testNewMethod() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor5(checkMethodVisitor);
-    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
-    assertEquals("m", checkMethodVisitor.lastVisitedMethodName);
+  public void testVisitLocalVariableAnnotation_asm4Visitor() {
+    MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
+
+    Executable visitLocalVariableAnnotation =
+        () -> methodVisitor.visitLocalVariableAnnotation(0, null, null, null, null, null, false);
+
+    Exception exception =
+        assertThrows(UnsupportedOperationException.class, visitLocalVariableAnnotation);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
   }
 
-  /** Tests the ASM5 visitMethodInsn succeeds on an ASM5 visitor which overrides this method. */
   @Test
-  public void testNewMethodOverride() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor5Override(checkMethodVisitor);
-    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
-    assertEquals("mv5", checkMethodVisitor.lastVisitedMethodName);
+  public void testVisitFrame_consecutiveFrames_sameFrame() {
+    MethodVisitor methodVisitor =
+        new ClassWriter(0).visitMethod(Opcodes.ACC_STATIC, "m", "()V", null, null);
+    methodVisitor.visitCode();
+    methodVisitor.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+
+    Executable visitFrame = () -> methodVisitor.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+
+    assertDoesNotThrow(visitFrame);
   }
 
-  /**
-   * Tests that method visitors with different API versions can be chained together and produce the
-   * expected result.
-   */
   @Test
-  public void testBackwardCompatibilityMixedChain5() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor4(checkMethodVisitor);
-    methodVisitor = new MethodVisitor4Override(methodVisitor);
-    methodVisitor = new MethodVisitor5(methodVisitor);
-    methodVisitor = new MethodVisitor5Override(methodVisitor);
-    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
-    assertEquals("mv5v4", checkMethodVisitor.lastVisitedMethodName);
+  public void testVisitFrame_consecutiveFrames() {
+    MethodVisitor methodVisitor =
+        new ClassWriter(0).visitMethod(Opcodes.ACC_STATIC, "m", "()V", null, null);
+    methodVisitor.visitCode();
+    methodVisitor.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+
+    Executable visitFrame =
+        () ->
+            methodVisitor.visitFrame(Opcodes.F_APPEND, 1, new Object[] {Opcodes.INTEGER}, 0, null);
+
+    assertThrows(IllegalStateException.class, visitFrame);
   }
 
-  /**
-   * Tests that method visitors with different API versions can be chained together and produce the
-   * expected result.
-   */
+  /** Tests the ASM4 visitMethodInsn on an ASM4 visitor. */
   @Test
-  public void testBackwardCompatibilityMixedChain4() {
-    CheckMethodVisitor checkMethodVisitor = new CheckMethodVisitor();
-    MethodVisitor methodVisitor = new MethodVisitor5(checkMethodVisitor);
-    methodVisitor = new MethodVisitor5Override(methodVisitor);
-    methodVisitor = new MethodVisitor4(methodVisitor);
-    methodVisitor = new MethodVisitor4Override(methodVisitor);
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_asm4Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
+
     methodVisitor.visitMethodInsn(0, "C", "m", "()V");
-    assertEquals("mv4v5", checkMethodVisitor.lastVisitedMethodName);
+
+    assertEquals("LogMethodVisitor:m()V;", log.toString());
+  }
+
+  /** Tests the ASM4 visitMethodInsn on an ASM4 visitor which overrides this method. */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_overridenAsm4Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals("LogMethodVisitor:m4()V;MethodVisitor4:m()V;", log.toString());
+  }
+
+  /** Tests the ASM4 visitMethodInsn on an ASM5 visitor. */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_asm5Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor5(logMethodVisitor);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals("LogMethodVisitor:m()V;", log.toString());
+  }
+
+  /** Tests the ASM4 visitMethodInsn on an ASM5 visitor which overrides the ASM5 method. */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_overridenAsm5Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor5Override(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals("LogMethodVisitor:m5()V;MethodVisitor5:m()V;", log.toString());
+  }
+
+  /**
+   * Tests the ASM4 visitMethodInsn on an ASM4 visitor which overrides this method, and is a
+   * subclass of an ASM subclass of MethodVisitor.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_userTraceMethodVisitor4() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new UserTraceMethodVisitor4(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals(
+        "LogMethodVisitor:m()V;TraceMethodVisitor:m()V;UserTraceMethodVisitor4:m()V;",
+        log.toString());
+  }
+
+  /**
+   * Tests the ASM4 visitMethodInsn on an ASM5 visitor which overrides the ASM5 method, and is a
+   * subclass of an ASM subclass of MethodVisitor.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_userTraceMethodVisitor5() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new UserTraceMethodVisitor5(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals(
+        "LogMethodVisitor:m()V;TraceMethodVisitor:m()V;UserTraceMethodVisitor5:m()V;",
+        log.toString());
+  }
+
+  /**
+   * Tests that method visitors with different API versions can be chained together and produce the
+   * expected result, when calling the ASM4 visitMethodInsn on the first visitor.
+   */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_mixedVisitorChain() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor =
+        new MethodVisitor4Override(
+            new MethodVisitor4(
+                new MethodVisitor5Override(new MethodVisitor5(logMethodVisitor), log)),
+            log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V");
+
+    assertEquals(
+        "LogMethodVisitor:m45()V;MethodVisitor5:m4()V;MethodVisitor4:m()V;", log.toString());
+  }
+
+  /** Tests the ASM5 visitMethodInsn on an ASM4 visitor, with isInterface set to false. */
+  @Test
+  public void testVisitMethodInsn_asm4Visitor_isNotInterface() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals("LogMethodVisitor:m()V;", log.toString());
+  }
+
+  /** Tests the ASM5 visitMethodInsn on an ASM4 visitor, with isInterface set to true. */
+  @Test
+  public void testVisitMethodInsn_asm4Visitor_isInterface() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
+
+    Executable visitMethodInsn = () -> methodVisitor.visitMethodInsn(0, "C", "m", "()V", true);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitMethodInsn);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+  }
+
+  /**
+   * Tests the ASM5 visitMethodInsn on an ASM4 visitor which overrides the ASM4 method, with
+   * isInterface set to false.
+   */
+  @Test
+  public void testVisitMethodInsn_overridenAsm4Visitor_isNotInterface() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals("LogMethodVisitor:m4()V;MethodVisitor4:m()V;", log.toString());
+  }
+
+  /**
+   * Tests the ASM5 visitMethodInsn on an ASM4 visitor which overrides the ASM4 method, with
+   * isInterface set to true.
+   */
+  @Test
+  public void testVisitMethodInsn_overridenAsm4Visitor_isInterface() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
+
+    Executable visitMethodInsn = () -> methodVisitor.visitMethodInsn(0, "C", "m", "()V", true);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitMethodInsn);
+    assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+  }
+
+  /** Tests the ASM5 visitMethodInsn on an ASM5 visitor. */
+  @Test
+  public void testVisitMethodInsn_asm5Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor5(logMethodVisitor);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals("LogMethodVisitor:m()V;", log.toString());
+  }
+
+  /** Tests the ASM5 visitMethodInsn on an ASM5 visitor which overrides this method. */
+  @Test
+  public void testVisitMethodInsn_overridenAsm5Visitor() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new MethodVisitor5Override(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals("LogMethodVisitor:m5()V;MethodVisitor5:m()V;", log.toString());
+  }
+
+  /**
+   * Tests the ASM5 visitMethodInsn on an ASM4 visitor which overrides this method, and is a
+   * subclass of an ASM subclass of MethodVisitor.
+   */
+  @Test
+  public void testVisitMethodInsn_userTraceMethodVisitor4() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new UserTraceMethodVisitor4(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals(
+        "LogMethodVisitor:m()V;TraceMethodVisitor:m()V;UserTraceMethodVisitor4:m()V;",
+        log.toString());
+  }
+
+  /**
+   * Tests the ASM5 visitMethodInsn on an ASM5 visitor which overrides this method, and is a
+   * subclass of an ASM subclass of MethodVisitor.
+   */
+  @Test
+  public void testVisitMethodInsn_userTraceMethodVisitor5() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor = new UserTraceMethodVisitor5(logMethodVisitor, log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals(
+        "LogMethodVisitor:m()V;TraceMethodVisitor:m()V;UserTraceMethodVisitor5:m()V;",
+        log.toString());
+  }
+
+  /**
+   * Tests that method visitors with different API versions can be chained together and produce the
+   * expected result, when calling the ASM5 visitMethodInsn on the first visitor.
+   */
+  @Test
+  public void testVisitMethodInsn_mixedVisitorChain() {
+    StringWriter log = new StringWriter();
+    LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
+    MethodVisitor methodVisitor =
+        new MethodVisitor5Override(
+            new MethodVisitor5(
+                new MethodVisitor4Override(new MethodVisitor4(logMethodVisitor), log)),
+            log);
+
+    methodVisitor.visitMethodInsn(0, "C", "m", "()V", false);
+
+    assertEquals(
+        "LogMethodVisitor:m54()V;MethodVisitor4:m5()V;MethodVisitor5:m()V;", log.toString());
   }
 
   /** An ASM4 {@link MethodVisitor} which does not override the ASM4 visitMethodInsn method. */
@@ -165,18 +402,23 @@ public class MethodVisitorTest {
 
   /**
    * An ASM4 {@link MethodVisitor} which overrides the ASM4 visitMethodInsn method, by adding "v4"
-   * at the end of method names.
+   * at the end of method names and by duplicating the instruction.
    */
   private static class MethodVisitor4Override extends MethodVisitor {
-    MethodVisitor4Override(final MethodVisitor methodVisitor) {
+
+    private final StringWriter log;
+
+    MethodVisitor4Override(final MethodVisitor methodVisitor, final StringWriter log) {
       super(Opcodes.ASM4, methodVisitor);
+      this.log = log;
     }
 
     @Deprecated
     @Override
     public void visitMethodInsn(
         final int opcode, final String owner, final String name, final String descriptor) {
-      super.visitMethodInsn(opcode, owner, name + "v4", descriptor);
+      super.visitMethodInsn(opcode, owner, name + "4", descriptor);
+      log.append("MethodVisitor4:" + name + descriptor + ";");
     }
   }
 
@@ -187,13 +429,14 @@ public class MethodVisitorTest {
     }
   }
 
-  /**
-   * An ASM5 {@link MethodVisitor} which overrides the ASM5 visitMethodInsn method, by adding "v5"
-   * at the end of method names.
-   */
+  /** An ASM5 {@link MethodVisitor} which overrides the ASM5 visitMethodInsn method. */
   private static class MethodVisitor5Override extends MethodVisitor {
-    MethodVisitor5Override(final MethodVisitor methodVisitor) {
+
+    private final StringWriter log;
+
+    MethodVisitor5Override(final MethodVisitor methodVisitor, final StringWriter log) {
       super(Opcodes.ASM5, methodVisitor);
+      this.log = log;
     }
 
     @Override
@@ -203,19 +446,63 @@ public class MethodVisitorTest {
         final String name,
         final String descriptor,
         final boolean isInterface) {
-      super.visitMethodInsn(opcode, owner, name + "v5", descriptor, isInterface);
+      super.visitMethodInsn(opcode, owner, name + "5", descriptor, isInterface);
+      log.append("MethodVisitor5:" + name + descriptor + ";");
     }
   }
 
   /**
-   * A {@link MethodVisitor} that records the name of the last visited method instruction, via the
-   * ASM5 visitMethodInsn method.
+   * An ASM-like {@link MethodVisitor} subclass, which overrides the ASM5 visitMethodInsn method,
+   * but can be used with any API version.
    */
-  private static class CheckMethodVisitor extends MethodVisitor {
-    public String lastVisitedMethodName;
+  private static class TraceMethodVisitor extends MethodVisitor {
 
-    CheckMethodVisitor() {
-      super(Opcodes.ASM5);
+    protected final StringWriter log;
+
+    TraceMethodVisitor(final int api, final MethodVisitor methodVisitor, final StringWriter log) {
+      super(api, methodVisitor);
+      this.log = log;
+    }
+
+    @Override
+    public void visitMethodInsn(
+        final int opcodeAndSource,
+        final String owner,
+        final String name,
+        final String descriptor,
+        final boolean isInterface) {
+      if (api < Opcodes.ASM5 && (opcodeAndSource & Opcodes.SOURCE_DEPRECATED) == 0) {
+        // Redirect the call to the deprecated version of this method.
+        super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+        return;
+      }
+      super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+
+      log.append("TraceMethodVisitor:" + name + descriptor + ";");
+    }
+  }
+
+  /** A user subclass of {@link TraceMethodVisitor}, implemented for ASM4. */
+  private static class UserTraceMethodVisitor4 extends TraceMethodVisitor {
+
+    UserTraceMethodVisitor4(final MethodVisitor methodVisitor, final StringWriter log) {
+      super(Opcodes.ASM4, methodVisitor, log);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void visitMethodInsn(
+        final int opcode, final String owner, final String name, final String descriptor) {
+      super.visitMethodInsn(opcode, owner, name, descriptor);
+      log.append("UserTraceMethodVisitor4:" + name + descriptor + ";");
+    }
+  }
+
+  /** A user subclass of {@link TraceMethodVisitor}, implemented for ASM5. */
+  private static class UserTraceMethodVisitor5 extends TraceMethodVisitor {
+
+    UserTraceMethodVisitor5(final MethodVisitor methodVisitor, final StringWriter log) {
+      super(Opcodes.ASM5, methodVisitor, log);
     }
 
     @Override
@@ -225,7 +512,29 @@ public class MethodVisitorTest {
         final String name,
         final String descriptor,
         final boolean isInterface) {
-      this.lastVisitedMethodName = name;
+      super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+      log.append("UserTraceMethodVisitor5:" + name + descriptor + ";");
+    }
+  }
+
+  /** A {@link MethodVisitor} that logs the calls to its ASM5 visitMethodInsn method. */
+  private static class LogMethodVisitor extends MethodVisitor {
+
+    private final StringWriter log;
+
+    LogMethodVisitor(final StringWriter log) {
+      super(Opcodes.ASM7);
+      this.log = log;
+    }
+
+    @Override
+    public void visitMethodInsn(
+        final int opcode,
+        final String owner,
+        final String name,
+        final String descriptor,
+        final boolean isInterface) {
+      log.append("LogMethodVisitor:" + name + descriptor + ";");
     }
   }
 }

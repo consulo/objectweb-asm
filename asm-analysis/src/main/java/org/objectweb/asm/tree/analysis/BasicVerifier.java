@@ -28,7 +28,6 @@
 package org.objectweb.asm.tree.analysis;
 
 import java.util.List;
-
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
@@ -48,7 +47,7 @@ public class BasicVerifier extends BasicInterpreter {
    * use this constructor</i>. Instead, they must use the {@link #BasicVerifier(int)} version.
    */
   public BasicVerifier() {
-    super(ASM6);
+    super(ASM7);
     if (getClass() != BasicVerifier.class) {
       throw new IllegalStateException();
     }
@@ -59,7 +58,7 @@ public class BasicVerifier extends BasicInterpreter {
    *
    * @param api the ASM API version supported by this interpreter. Must be one of {@link
    *     org.objectweb.asm.Opcodes#ASM4}, {@link org.objectweb.asm.Opcodes#ASM5}, {@link
-   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7_EXPERIMENTAL}.
+   *     org.objectweb.asm.Opcodes#ASM6} or {@link org.objectweb.asm.Opcodes#ASM7}.
    */
   protected BasicVerifier(final int api) {
     super(api);
@@ -376,9 +375,9 @@ public class BasicVerifier extends BasicInterpreter {
       throws AnalyzerException {
     int opcode = insn.getOpcode();
     if (opcode == MULTIANEWARRAY) {
-      for (int i = 0; i < values.size(); ++i) {
-        if (!BasicValue.INT_VALUE.equals(values.get(i))) {
-          throw new AnalyzerException(insn, null, BasicValue.INT_VALUE, values.get(i));
+      for (BasicValue value : values) {
+        if (!BasicValue.INT_VALUE.equals(value)) {
+          throw new AnalyzerException(insn, null, BasicValue.INT_VALUE, value);
         }
       }
     } else {

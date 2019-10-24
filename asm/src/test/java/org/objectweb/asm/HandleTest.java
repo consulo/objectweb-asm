@@ -29,20 +29,34 @@ package org.objectweb.asm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 /**
- * Handle tests.
+ * Unit tests for {@link Handle}.
  *
  * @author Eric Bruneton
  */
 public class HandleTest {
 
   @Test
-  public void testGetField() {
-    Handle handle = new Handle(Opcodes.H_GETFIELD, "owner", "name", "descriptor");
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedConstructor() {
+    Handle handle1 = new Handle(Opcodes.H_INVOKEINTERFACE, "owner", "name", "descriptor");
+    Handle handle2 = new Handle(Opcodes.H_INVOKESPECIAL, "owner", "name", "descriptor");
+
+    assertTrue(handle1.isInterface());
+    assertFalse(handle2.isInterface());
+    assertEquals("owner.namedescriptor (9 itf)", handle1.toString());
+    assertEquals("owner.namedescriptor (7)", handle2.toString());
+  }
+
+  @Test
+  public void testConstructor() {
+    Handle handle = new Handle(Opcodes.H_GETFIELD, "owner", "name", "descriptor", false);
+
     assertEquals(Opcodes.H_GETFIELD, handle.getTag());
     assertEquals("owner", handle.getOwner());
     assertEquals("name", handle.getName());
@@ -52,32 +66,26 @@ public class HandleTest {
   }
 
   @Test
-  public void testInvokeInterface() {
-    Handle handle = new Handle(Opcodes.H_INVOKEINTERFACE, "owner", "name", "descriptor");
-    assertTrue(handle.isInterface());
-    assertEquals("owner.namedescriptor (9 itf)", handle.toString());
-  }
-
-  @Test
   public void testEquals() {
     Handle handle1 = new Handle(Opcodes.H_GETFIELD, "owner", "name", "descriptor", false);
     Handle handle2 = new Handle(Opcodes.H_GETFIELD, "owner", "name", "descriptor", false);
-    assertTrue(handle1.equals(handle1));
-    assertTrue(handle1.equals(handle2));
-    assertFalse(handle1.equals(null));
-    assertFalse(
-        handle1.equals(new Handle(Opcodes.H_PUTFIELD, "owner", "name", "descriptor", false)));
-    assertFalse(handle1.equals(new Handle(Opcodes.H_GETFIELD, "o", "name", "descriptor", false)));
-    assertFalse(handle1.equals(new Handle(Opcodes.H_GETFIELD, "owner", "n", "descriptor", false)));
-    assertFalse(handle1.equals(new Handle(Opcodes.H_GETFIELD, "owner", "name", "d", false)));
-    assertFalse(handle1.equals(new Handle(Opcodes.H_GETFIELD, "owner", "n", "descriptor", true)));
+
+    assertEquals(handle1, handle1);
+    assertEquals(handle1, handle2);
+    assertNotEquals(handle1, null);
+    assertNotEquals(handle1, new Handle(Opcodes.H_PUTFIELD, "owner", "name", "descriptor", false));
+    assertNotEquals(handle1, new Handle(Opcodes.H_GETFIELD, "o", "name", "descriptor", false));
+    assertNotEquals(handle1, new Handle(Opcodes.H_GETFIELD, "owner", "n", "descriptor", false));
+    assertNotEquals(handle1, new Handle(Opcodes.H_GETFIELD, "owner", "name", "d", false));
+    assertNotEquals(handle1, new Handle(Opcodes.H_GETFIELD, "owner", "n", "descriptor", true));
   }
 
   @Test
   public void testHashCode() {
-    assertTrue(
-        new Handle(Opcodes.H_INVOKESTATIC, "owner", "name", "descriptor", false).hashCode() != 0);
-    assertTrue(
-        new Handle(Opcodes.H_INVOKESTATIC, "owner", "name", "descriptor", true).hashCode() != 0);
+    Handle handle1 = new Handle(Opcodes.H_INVOKESTATIC, "owner", "name", "descriptor", false);
+    Handle handle2 = new Handle(Opcodes.H_INVOKESTATIC, "owner", "name", "descriptor", true);
+
+    assertNotEquals(0, handle1.hashCode());
+    assertNotEquals(0, handle2.hashCode());
   }
 }

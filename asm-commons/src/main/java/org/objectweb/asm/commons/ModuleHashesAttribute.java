@@ -30,7 +30,6 @@ package org.objectweb.asm.commons;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ByteVector;
 import org.objectweb.asm.ClassReader;
@@ -92,8 +91,8 @@ public final class ModuleHashesAttribute extends Attribute {
     int numModules = classReader.readUnsignedShort(currentOffset);
     currentOffset += 2;
 
-    ArrayList<String> moduleList = new ArrayList<String>(numModules);
-    ArrayList<byte[]> hashList = new ArrayList<byte[]>(numModules);
+    ArrayList<String> moduleList = new ArrayList<>(numModules);
+    ArrayList<byte[]> hashList = new ArrayList<>(numModules);
 
     for (int i = 0; i < numModules; ++i) {
       String module = classReader.readModule(currentOffset, charBuffer);

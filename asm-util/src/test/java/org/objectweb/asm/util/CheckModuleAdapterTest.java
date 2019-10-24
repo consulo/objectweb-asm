@@ -27,90 +27,153 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
-import org.objectweb.asm.ModuleVisitor;
+import org.junit.jupiter.api.function.Executable;
 import org.objectweb.asm.Opcodes;
 
 /**
- * CheckModuleAdapter tests.
+ * Unit tests for {@link CheckModuleAdapter}.
  *
  * @author Eric Bruneton
  */
 public class CheckModuleAdapterTest {
 
-  private CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
-
   @Test
   public void testConstructor() {
+    assertDoesNotThrow(() -> new CheckModuleAdapter(null, /* open = */ false));
     assertThrows(
         IllegalStateException.class, () -> new CheckModuleAdapter(null, /* open = */ false) {});
   }
 
-  @Test
-  public void testNullArraysSupported() {
-    checkModuleAdapter.visitExport("package", 0, (String[]) null);
-    checkModuleAdapter.visitOpen("package", 0, (String[]) null);
+  @Test // see issue #317804
+  public void testVisitRequire_javaBaseTransitive() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+    checkModuleAdapter.classVersion = Opcodes.V10;
+
+    Executable visitRequire =
+        () -> checkModuleAdapter.visitRequire("java.base", Opcodes.ACC_TRANSITIVE, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRequire);
+    assertEquals(
+        "Invalid access flags: 32 java.base can not be declared ACC_TRANSITIVE or ACC_STATIC_PHASE",
+        exception.getMessage());
+  }
+
+  @Test // see issue #317804
+  public void testVisitRequire_javaBaseStaticPhase() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+    checkModuleAdapter.classVersion = Opcodes.V10;
+
+    Executable visitRequire =
+        () -> checkModuleAdapter.visitRequire("java.base", Opcodes.ACC_STATIC_PHASE, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRequire);
+    assertEquals(
+        "Invalid access flags: 64 java.base can not be declared ACC_TRANSITIVE or ACC_STATIC_PHASE",
+        exception.getMessage());
+  }
+
+  @Test // see issue #317804
+  public void testVisitRequire_javaBaseTransitiveAndStaticPhase() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+    checkModuleAdapter.classVersion = Opcodes.V10;
+
+    Executable visitRequire =
+        () ->
+            checkModuleAdapter.visitRequire(
+                "java.base", Opcodes.ACC_TRANSITIVE | Opcodes.ACC_STATIC_PHASE, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRequire);
+    assertEquals(
+        "Invalid access flags: 96 java.base can not be declared ACC_TRANSITIVE or ACC_STATIC_PHASE",
+        exception.getMessage());
+  }
+
+  @Test // see issue #317804
+  public void testVisitRequire_javaBaseTransitiveOrStaticPhaseAreIgnoredUnderJvms9() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+    checkModuleAdapter.classVersion = Opcodes.V9;
+
+    Executable visitRequire =
+        () ->
+            checkModuleAdapter.visitRequire(
+                "java.base", Opcodes.ACC_TRANSITIVE | Opcodes.ACC_STATIC_PHASE, null);
+
+    assertDoesNotThrow(visitRequire);
   }
 
   @Test
-  public void testIllegalOpen() {
-    checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ true);
-    assertThrows(
-        RuntimeException.class, () -> checkModuleAdapter.visitOpen("package", 0, (String[]) null));
+  public void testVisitExport_nullArray() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+
+    Executable visitExport = () -> checkModuleAdapter.visitExport("package", 0, (String[]) null);
+
+    assertDoesNotThrow(visitExport);
   }
 
   @Test
-  public void testNameAlreadyDeclared() {
+  public void testVisitOpen_nullArray() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+
+    Executable visitOpen = () -> checkModuleAdapter.visitOpen("package", 0, (String[]) null);
+
+    assertDoesNotThrow(visitOpen);
+  }
+
+  @Test
+  public void testVisitOpen_openModule() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ true);
+
+    Executable visitOpen = () -> checkModuleAdapter.visitOpen("package", 0, (String[]) null);
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitOpen);
+    assertEquals("An open module can not use open directive", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitUse_nameAlreadyDeclared() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
     checkModuleAdapter.visitUse("service");
-    assertThrows(RuntimeException.class, () -> checkModuleAdapter.visitUse("service"));
+
+    Executable visitUse = () -> checkModuleAdapter.visitUse("service");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitUse);
+    assertEquals("Module uses 'service' already declared", exception.getMessage());
   }
 
   @Test
-  public void testIllegalProvide() {
-    assertThrows(RuntimeException.class, () -> checkModuleAdapter.visitProvide("service1"));
-    assertThrows(
-        RuntimeException.class, () -> checkModuleAdapter.visitProvide("service2", (String[]) null));
-  }
-
-  @Test
-  public void testIllegalMemberVisitAfterEnd() {
+  public void testVisitUse_afterEnd() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
     checkModuleAdapter.visitEnd();
-    assertThrows(RuntimeException.class, () -> checkModuleAdapter.visitUse("service"));
+
+    Executable visitUse = () -> checkModuleAdapter.visitUse("service");
+
+    Exception exception = assertThrows(IllegalStateException.class, visitUse);
+    assertEquals(
+        "Cannot call a visit method after visitEnd has been called", exception.getMessage());
   }
-  
-  @Test // see issue #317804
-  public void testRequireJavaBaseTransitive() {
-    CheckClassAdapter adapter = new CheckClassAdapter(null, false);
-    adapter.visit(Opcodes.V10, Opcodes.ACC_PUBLIC, "module-info", null, null, null);
-    ModuleVisitor moduleVisitor = adapter.visitModule("org.objectweb.asm", 0, null);
-    assertThrows(IllegalArgumentException.class, () -> moduleVisitor.visitRequire("java.base", Opcodes.ACC_TRANSITIVE, null));
+
+  @Test
+  public void testVisitProvide_nullProviderList() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+
+    Executable visitProvide = () -> checkModuleAdapter.visitProvide("service2", (String[]) null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitProvide);
+    assertEquals("Providers cannot be null or empty", exception.getMessage());
   }
-  
-  @Test  // see issue #317804
-  public void testRequireJavaBaseStaticPhase() {
-    CheckClassAdapter adapter = new CheckClassAdapter(null, false);
-    adapter.visit(Opcodes.V10, Opcodes.ACC_PUBLIC, "module-info", null, null, null);
-    ModuleVisitor moduleVisitor = adapter.visitModule("org.objectweb.asm", 0, null);
-    assertThrows(IllegalArgumentException.class, () -> moduleVisitor.visitRequire("java.base", Opcodes.ACC_STATIC_PHASE, null));
-  }
-  
-  @Test  // see issue #317804
-  public void testRequireJavaBaseTransitiveAndStaticPhase() {
-    CheckClassAdapter adapter = new CheckClassAdapter(null, false);
-    adapter.visit(Opcodes.V10, Opcodes.ACC_PUBLIC, "module-info", null, null, null);
-    ModuleVisitor moduleVisitor = adapter.visitModule("org.objectweb.asm", 0, null);
-    assertThrows(IllegalArgumentException.class, () -> moduleVisitor.visitRequire("java.base", Opcodes.ACC_TRANSITIVE | Opcodes.ACC_STATIC_PHASE, null));
-  }
-  
-  @Test // see issue #317804
-  public void testRequireJavaBaseTransitiveOrStaticPhaseAreIgnoredUnderJVMS9() {
-    CheckClassAdapter adapter = new CheckClassAdapter(null, false);
-    adapter.visit(Opcodes.V9, Opcodes.ACC_PUBLIC, "module-info", null, null, null);
-    ModuleVisitor moduleVisitor = adapter.visitModule("org.objectweb.asm", 0, null);
-    moduleVisitor.visitRequire("java.base", Opcodes.ACC_TRANSITIVE | Opcodes.ACC_STATIC_PHASE, null);
-    moduleVisitor.visitEnd();
-    adapter.visitEnd();
+
+  @Test
+  public void testVisitProvide_emptyProviderList() {
+    CheckModuleAdapter checkModuleAdapter = new CheckModuleAdapter(null, /* open = */ false);
+
+    Executable visitProvide = () -> checkModuleAdapter.visitProvide("service1");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitProvide);
+    assertEquals("Providers cannot be null or empty", exception.getMessage());
   }
 }

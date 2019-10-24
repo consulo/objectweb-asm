@@ -27,24 +27,12 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
-import org.junit.jupiter.params.provider.Arguments;
-
-import java.io.InputStream;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Modifier;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStream;
 import java.util.Arrays;
-import java.util.StringTokenizer;
 import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 
 /**
  * Base class for the ASM tests. ASM can be used to read, write or transform any Java class, ranging
@@ -88,9 +76,6 @@ public abstract class AsmTest {
   /** The size of the temporary byte array used to read class input streams chunk by chunk. */
   private static final int INPUT_STREAM_DATA_CHUNK_SIZE = 4096;
 
-  /** The name of JDK9 module classes. */
-  private static final String MODULE_INFO = "module-info";
-
   /**
    * MethodSource name to be used in parameterized tests that must be instantiated for all possible
    * (precompiled class, api) pairs.
@@ -102,6 +87,12 @@ public abstract class AsmTest {
    * precompiled classes, with the latest api.
    */
   public static final String ALL_CLASSES_AND_LATEST_API = "allClassesAndLatestApi";
+
+  /**
+   * The expected pattern (i.e. regular expression) that ASM's UnsupportedOperationException
+   * messages are supposed to match.
+   */
+  public static final String UNSUPPORTED_OPERATION_MESSAGE_PATTERN = ".* requires ASM[567]";
 
   /**
    * A precompiled class, hand-crafted to contain some set of class file structures. These classes
@@ -125,14 +116,13 @@ public abstract class AsmTest {
     JDK8_ALL_INSTRUCTIONS("jdk8.AllInstructions"),
     JDK8_ALL_STRUCTURES("jdk8.AllStructures"),
     JDK8_ANONYMOUS_INNER_CLASS("jdk8.AllStructures$1"),
-    JDK8_ARTIFICIAL_STRUCTURES("jdk8.ArtificialStructures"),
+    JDK8_ARTIFICIAL_STRUCTURES("jdk8.Artificial$()$Structures"),
     JDK8_INNER_CLASS("jdk8.AllStructures$InnerClass"),
     JDK8_LARGE_METHOD("jdk8.LargeMethod"),
     JDK9_MODULE("jdk9.module-info"),
     JDK11_ALL_INSTRUCTIONS("jdk11.AllInstructions"),
     JDK11_ALL_STRUCTURES("jdk11.AllStructures"),
-    JDK11_ALL_STRUCTURES_NESTED("jdk11.AllStructures$Nested"),
-    JDK11_LAMBDA_CONDY("jdk11.LambdaCondy");
+    JDK11_ALL_STRUCTURES_NESTED("jdk11.AllStructures$Nested");
 
     private final String name;
 
@@ -140,14 +130,22 @@ public abstract class AsmTest {
       this.name = name;
     }
 
-    /** @return the fully qualified name of this class. */
+    /**
+     * Returns the fully qualified name of this class.
+     *
+     * @return the fully qualified name of this class.
+     */
     public String getName() {
       return name;
     }
 
-    /** @return the internal name of this class. */
+    /**
+     * Returns the internal name of this class.
+     *
+     * @return the internal name of this class.
+     */
     public String getInternalName() {
-      return name.endsWith(MODULE_INFO) ? MODULE_INFO : name.replace('.', '/');
+      return name.endsWith(ClassFile.MODULE_INFO) ? ClassFile.MODULE_INFO : name.replace('.', '/');
     }
 
     /**
@@ -177,15 +175,19 @@ public abstract class AsmTest {
      */
     public boolean isMoreRecentThanCurrentJdk() {
       if (name.startsWith("jdk9.")) {
-        return getMajorJavaVersion() < 9;
+        return Util.getMajorJavaVersion() < 9;
       }
       if (name.startsWith("jdk11.")) {
-        return getMajorJavaVersion() < 11;
+        return Util.getMajorJavaVersion() < 11;
       }
       return false;
     }
 
-    /** @return the content of this class. */
+    /**
+     * Returns the content of this class.
+     *
+     * @return the content of this class.
+     */
     public byte[] getBytes() {
       return AsmTest.getBytes(name);
     }
@@ -221,7 +223,11 @@ public abstract class AsmTest {
       this.name = name;
     }
 
-    /** @return the content of this class. */
+    /**
+     * Returns the content of this class.
+     *
+     * @return the content of this class.
+     */
     public byte[] getBytes() {
       return AsmTest.getBytes(name);
     }
@@ -237,7 +243,7 @@ public abstract class AsmTest {
     ASM4("ASM4", 4 << 16),
     ASM5("ASM5", 5 << 16),
     ASM6("ASM6", 6 << 16),
-    ASM7("ASM7", 1 << 24 | 7 << 16);
+    ASM7("ASM7", 7 << 16);
 
     private final String name;
     private final int value;
@@ -269,7 +275,7 @@ public abstract class AsmTest {
 
   /**
    * Builds a list of test arguments for a parameterized test. Parameterized test cases annotated
-   * with <tt>@MethodSource("allClassesAndAllApis")</tt> will be executed on all the possible
+   * with {@code @MethodSource("allClassesAndAllApis")} will be executed on all the possible
    * (precompiledClass, api) pairs.
    *
    * @return all the possible (precompiledClass, api) pairs, for all the precompiled classes and all
@@ -281,7 +287,7 @@ public abstract class AsmTest {
 
   /**
    * Builds a list of test arguments for a parameterized test. Parameterized test cases annotated
-   * with <tt>@MethodSource("allClassesAndLatestApi")</tt> will be executed on all the precompiled
+   * with {@code @MethodSource("allClassesAndLatestApi")} will be executed on all the precompiled
    * classes, with the latest api.
    *
    * @return all the possible (precompiledClass, ASM7) pairs, for all the precompiled classes.
@@ -297,159 +303,12 @@ public abstract class AsmTest {
                 Arrays.stream(apis).map(api -> Arguments.of(precompiledClass, api)));
   }
 
-  private static int getMajorJavaVersion() {
-    String javaVersion = System.getProperty("java.version");
-    String javaMajorVersion = new StringTokenizer(javaVersion, "._").nextToken();
-    return Integer.parseInt(javaMajorVersion);
-  }
-
-  /**
-   * Starts an assertion about the given class content.
-   *
-   * @param classFile the content of a class.
-   * @return the {@link ClassSubject} to use to make actual assertions about the given class.
-   */
-  public static ClassSubject assertThatClass(final byte[] classFile) {
-    return new ClassSubject(classFile);
-  }
-
-  /** Helper to make assertions about a class. */
-  public static class ClassSubject {
-    /** The content of the class to be tested. */
-    private final byte[] classFile;
-
-    ClassSubject(final byte[] classFile) {
-      this.classFile = classFile;
-    }
-
-    /**
-     * Asserts that a dump of the subject class into a string representation contains the given
-     * string.
-     *
-     * @param expectedString a string which should be contained in a dump of the subject class.
-     */
-    public void contains(final String expectedString) {
-      try {
-        String dump = new ClassDump(classFile).toString();
-        assertTrue(dump.contains(expectedString));
-      } catch (IOException | IllegalArgumentException e) {
-        fail("Class can't be dumped", e);
-      }
-    }
-
-    /**
-     * Asserts that the subject class is equal to the given class, modulo some low level bytecode
-     * representation details (e.g. the order of the constants in the constant pool, the order of
-     * attributes and annotations, and low level details such as ldc vs ldc_w instructions).
-     *
-     * @param expectedClassFile a class file content which should be equal to the subject class.
-     */
-    public void isEqualTo(final byte[] expectedClassFile) {
-      try {
-        String dump = new ClassDump(classFile).toString();
-        String expectedDump = new ClassDump(expectedClassFile).toString();
-        assertEquals(expectedDump, dump);
-      } catch (IOException | IllegalArgumentException e) {
-        fail("Class can't be dumped", e);
-      }
-    }
-  }
-
-  /**
-   * Loads the given class in a new class loader. Also tries to instantiate the loaded class (if it
-   * is not an abstract or enum class, or a module-info class), in order to check that it passes the
-   * bytecode verification step. Checks as well that the class can be dumped, to make sure that the
-   * class is well formed.
-   *
-   * @param className the name of the class to load.
-   * @param classContent the content of the class to load.
-   * @return whether the class was loaded successfully.
-   */
-  public static boolean loadAndInstantiate(final String className, final byte[] classContent) {
-    try {
-      new ClassDump(classContent);
-    } catch (IOException | IllegalArgumentException e) {
-      fail("Class can't be dumped, probably invalid", e);
-    }
-    if (className.endsWith(MODULE_INFO)) {
-      if (getMajorJavaVersion() < 9) {
-        throw new UnsupportedClassVersionError();
-      } else {
-        return true;
-      }
-    } else {
-      return doLoadAndInstantiate(className, classContent);
-    }
-  }
-
-  /**
-   * Loads the given class in a new class loader. Also tries to instantiate the loaded class (if it
-   * is not an abstract or enum class), in order to check that it passes the bytecode verification
-   * step.
-   *
-   * @param className the name of the class to load.
-   * @param classContent the content of the class to load.
-   * @return whether the class was loaded successfully.
-   */
-  static boolean doLoadAndInstantiate(final String className, final byte[] classContent) {
-    ByteClassLoader byteClassLoader = new ByteClassLoader(className, classContent);
-    try {
-      Class<?> clazz = byteClassLoader.loadClass(className);
-      if (!clazz.isEnum() && (clazz.getModifiers() & Modifier.ABSTRACT) == 0) {
-        Constructor<?> constructor = clazz.getDeclaredConstructors()[0];
-        ArrayList<Object> arguments = new ArrayList<>();
-        for (Class<?> parameterType : constructor.getParameterTypes()) {
-          arguments.add(Array.get(Array.newInstance(parameterType, 1), 0));
-        }
-        constructor.setAccessible(true);
-        constructor.newInstance(arguments.toArray(new Object[arguments.size()]));
-      }
-    } catch (ClassNotFoundException e) {
-      // Should never happen given the ByteClassLoader implementation.
-      fail("Can't find class " + className, e);
-    } catch (InstantiationException | IllegalAccessException | IllegalArgumentException e) {
-      // Should never happen since we don't try to instantiate classes that can't be instantiated
-      // (abstract and enum classes), we use setAccessible(true), and we create the appropriate
-      // constructor arguments for the expected constructor parameters.
-      fail("Can't instantiate class " + className, e);
-    } catch (InvocationTargetException e) {
-      // If an exception occurs in the invoked constructor, it means the class was successfully
-      // verified first.
-    }
-    return byteClassLoader.classLoaded();
-  }
-
-  /** A simple ClassLoader to test that a class can be loaded in the JVM. */
-  private static class ByteClassLoader extends ClassLoader {
-    private final String className;
-    private final byte[] classContent;
-    private boolean classLoaded;
-
-    ByteClassLoader(final String className, final byte[] classContent) {
-      this.className = className;
-      this.classContent = classContent;
-    }
-
-    boolean classLoaded() {
-      return classLoaded;
-    }
-
-    @Override
-    protected Class<?> loadClass(final String name, final boolean resolve)
-        throws ClassNotFoundException {
-      if (name.equals(className)) {
-        classLoaded = true;
-        return defineClass(className, classContent, 0, classContent.length);
-      } else {
-        return super.loadClass(name, resolve);
-      }
-    }
-  }
-
   private static byte[] getBytes(final String name) {
     String resourceName = name.replace('.', '/') + ".class";
     try (InputStream inputStream = ClassLoader.getSystemResourceAsStream(resourceName)) {
-      assertNotNull(inputStream, "Class not found " + name);
+      if (inputStream == null) {
+        throw new IllegalArgumentException("Class not found " + name);
+      }
       ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
       byte[] data = new byte[INPUT_STREAM_DATA_CHUNK_SIZE];
       int bytesRead;
@@ -459,8 +318,7 @@ public abstract class AsmTest {
       outputStream.flush();
       return outputStream.toByteArray();
     } catch (IOException e) {
-      fail("Can't read " + name, e);
-      return new byte[0];
+      throw new ClassFormatException("Can't read " + name, e);
     }
   }
 }

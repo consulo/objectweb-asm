@@ -30,24 +30,18 @@ package org.objectweb.asm.util;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.StringTokenizer;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.signature.SignatureReader;
-import org.objectweb.asm.test.AsmTest.Api;
-import org.objectweb.asm.test.AsmTest.PrecompiledClass;
 
 /**
- * TraceSignatureVisitor unit tests.
+ * Unit tests for {@link TraceSignatureVisitor}.
  *
  * @author Eugene Kuleshov
  */
@@ -74,11 +68,7 @@ public class TraceSignatureVisitorTest {
       "<K extends java.lang.Enum<K>, V> extends java.util.AbstractMap<K, V> implements java.io.Serializable, java.lang.Cloneable",
       "<K:Ljava/lang/Enum<TK;>;V:Ljava/lang/Object;>Ljava/util/AbstractMap<TK;TV;>;Ljava/io/Serializable;Ljava/lang/Cloneable;"
     },
-    {
-      "false",
-      "<T, R extends T>",
-      "<T:Ljava/lang/Object;R:TT;>Ljava/lang/Object;"
-    }
+    {"false", "<T, R extends T>", "<T:Ljava/lang/Object;R:TT;>Ljava/lang/Object;"}
   };
 
   private static final String[][] FIELD_SIGNATURES = {
@@ -144,32 +134,47 @@ public class TraceSignatureVisitorTest {
     return Arrays.stream(METHOD_SIGNATURES).map(values -> Arguments.of((Object[]) values));
   }
 
+  @Test
+  public void testVisitBaseType_invalidSignature() {
+    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
+
+    Executable visitBaseType = () -> traceSignatureVisitor.visitBaseType('-');
+
+    assertThrows(IllegalArgumentException.class, visitBaseType);
+  }
+
   @ParameterizedTest
   @MethodSource("classSignatures")
-  public void testClassSignature(
+  public void testVisitMethods_classSignature(
       final boolean isInterface, final String declaration, final String signature) {
+    SignatureReader signatureReader = new SignatureReader(signature);
     TraceSignatureVisitor traceSignatureVisitor =
         new TraceSignatureVisitor(isInterface ? Opcodes.ACC_INTERFACE : 0);
-    SignatureReader signatureReader = new SignatureReader(signature);
+
     signatureReader.accept(traceSignatureVisitor);
+
     assertEquals(declaration, traceSignatureVisitor.getDeclaration());
   }
 
   @ParameterizedTest
   @MethodSource("fieldSignatures")
-  public void testFieldSignature(final String declaration, final String signature) {
-    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
+  public void testVisitMethods_fieldSignature(final String declaration, final String signature) {
     SignatureReader signatureReader = new SignatureReader(signature);
+    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
+
     signatureReader.acceptType(traceSignatureVisitor);
+
     assertEquals(declaration, traceSignatureVisitor.getDeclaration());
   }
 
   @ParameterizedTest
   @MethodSource("methodSignatures")
-  public void testMethodSignature(final String declaration, final String signature) {
-    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
+  public void testVisitMethods_methodSignature(final String declaration, final String signature) {
     SignatureReader signatureReader = new SignatureReader(signature);
+    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
+
     signatureReader.accept(traceSignatureVisitor);
+
     String fullMethodDeclaration =
         traceSignatureVisitor.getReturnType()
             + traceSignatureVisitor.getDeclaration()
@@ -177,11 +182,5 @@ public class TraceSignatureVisitorTest {
                 ? traceSignatureVisitor.getExceptions()
                 : "");
     assertEquals(declaration, fullMethodDeclaration);
-  }
-
-  @Test
-  public void testInvalidSignature() {
-    TraceSignatureVisitor traceSignatureVisitor = new TraceSignatureVisitor(0);
-    assertThrows(IllegalArgumentException.class, () -> traceSignatureVisitor.visitBaseType('-'));
   }
 }

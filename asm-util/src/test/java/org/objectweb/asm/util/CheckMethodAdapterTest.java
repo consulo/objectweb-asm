@@ -27,16 +27,14 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.util.HashMap;
-
 import org.junit.jupiter.api.Test;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
+import org.junit.jupiter.api.function.Executable;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -46,509 +44,857 @@ import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.test.AsmTest;
 
 /**
- * CheckMethodAdapter tests.
+ * Unit tests for {@link CheckMethodAdapter}.
  *
  * @author Eric Bruneton
  */
 public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
 
-  private CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
+  private final CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
 
   @Test
   public void testConstructor() {
+    assertDoesNotThrow(() -> new CheckMethodAdapter(null));
     assertThrows(IllegalStateException.class, () -> new CheckMethodAdapter(null) {});
     assertThrows(
         IllegalStateException.class, () -> new CheckMethodAdapter(0, "name", "()V", null, null) {});
   }
 
   @Test
-  public void testDataflowCheckRequiresMaxLocalsAndMaxStack() {
-    CheckMethodAdapter checkMethodAdapterWithDataFlowCheck =
-        new CheckMethodAdapter(0, "m", "()V", null, new HashMap<Label, Integer>());
-    checkMethodAdapterWithDataFlowCheck.visitCode();
-    checkMethodAdapterWithDataFlowCheck.visitVarInsn(ALOAD, 0);
-    checkMethodAdapterWithDataFlowCheck.visitInsn(RETURN);
-    checkMethodAdapterWithDataFlowCheck.visitMaxs(0, 0);
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> checkMethodAdapterWithDataFlowCheck.visitEnd());
-    assertTrue(exception.getMessage().contains("non zero maxLocals and maxStack"));
+  public void testVisitTypeAnnotation_illegalTypeRef() {
+    Executable visitTypeAnnotation =
+        () -> checkMethodAdapter.visitTypeAnnotation(0xFFFFFFFF, null, "LA;", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTypeAnnotation);
+    assertEquals("Invalid type reference sort 0xff", exception.getMessage());
   }
 
   @Test
-  public void testIllegalAnnotation() {
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitParameterAnnotation(0, "'", true));
-  }
-
-  @Test
-  public void testIllegalTypeAnnotation() {
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTypeAnnotation(0xFFFFFFFF, null, "LA;", true));
-  }
-
-  @Test
-  public void testIllegalParameterAnnotation() {
+  public void testVisitParameterAnnotation_invisibleAnnotation_illegalParameterIndex() {
     checkMethodAdapter.visitAnnotableParameterCount(1, false);
+
+    Executable visitParameterAnnotation =
+        () -> checkMethodAdapter.visitParameterAnnotation(1, "LA;", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitParameterAnnotation);
+    assertEquals("Invalid parameter index", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitParameterAnnotation_visibleAnnotation_illegalParameterIndex() {
     checkMethodAdapter.visitAnnotableParameterCount(2, true);
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitParameterAnnotation(1, "LA;", false));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitParameterAnnotation(2, "LA;", true));
+
+    Executable visitParameterAnnotation =
+        () -> checkMethodAdapter.visitParameterAnnotation(2, "LA;", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitParameterAnnotation);
+    assertEquals("Invalid parameter index", exception.getMessage());
   }
 
   @Test
-  public void testIllegalCode() {
-    checkMethodAdapter =
-        new CheckMethodAdapter(
-            Opcodes.ACC_ABSTRACT, "m", "()V", null, new HashMap<Label, Integer>());
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitCode());
+  public void testVisitParameterAnnotation_illegalDescriptor() {
+    Executable visitParameterAnnotation =
+        () -> checkMethodAdapter.visitParameterAnnotation(0, "'", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitParameterAnnotation);
+    assertEquals("Invalid descriptor: '", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodMemberVisitAfterEnd() {
+  public void testVisitAttribute_afterEnd() {
     checkMethodAdapter.visitEnd();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitAttribute(new Comment()));
+
+    Executable visitAttribute = () -> checkMethodAdapter.visitAttribute(new Comment());
+
+    Exception exception = assertThrows(IllegalStateException.class, visitAttribute);
+    assertEquals("Cannot visit elements after visitEnd has been called.", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodAttribute() {
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitAttribute(null));
+  public void testVisitAttribute_nullAttribute() {
+    Executable visitAttribute = () -> checkMethodAdapter.visitAttribute(null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitAttribute);
+    assertEquals("Invalid attribute (must not be null)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnVisitBeforeStart() {
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitInsn(NOP));
+  public void testVisitCode_abstractMethod() {
+    CheckMethodAdapter checkAbstractMethodAdapter =
+        new CheckMethodAdapter(Opcodes.ACC_ABSTRACT, "m", "()V", null, new HashMap<>());
+
+    Executable visitCode = () -> checkAbstractMethodAdapter.visitCode();
+
+    Exception exception = assertThrows(UnsupportedOperationException.class, visitCode);
+    assertEquals("Abstract methods cannot have code", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameType() {
+  public void testVisitFrame_illegalFrameType() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFrame(123, 0, null, 0, null));
+
+    Executable visitFrame = () -> checkMethodAdapter.visitFrame(123, 0, null, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Invalid frame type 123", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameLocalCount() {
+  public void testVisitFrame_illegalLocalCount() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_SAME, 1, new Object[] {INTEGER}, 0, null));
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_SAME, 1, new Object[] {INTEGER}, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Invalid numLocal=1 for frame type 3", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameStackCount() {
+  public void testVisitFrame_illegalStackCount() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_SAME, 0, null, 1, new Object[] {INTEGER}));
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_SAME, 0, null, 1, new Object[] {INTEGER});
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Invalid numStack=1 for frame type 3", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameLocalArray() {
+  public void testVisitFrame_illegalLocalArray() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_APPEND, 1, new Object[0], 0, null));
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_APPEND, 1, new Object[0], 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Array local[] is shorter than numLocal", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameStackArray() {
+  public void testVisitFrame_illegalStackArray() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_SAME1, 0, null, 1, new Object[0]));
+
+    Executable visitFrame = () -> checkMethodAdapter.visitFrame(F_SAME1, 0, null, 1, new Object[0]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Array stack[] is shorter than numStack", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFrameValue() {
+  public void testVisitFrame_illegalDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {"LC;"}, 0, null));
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {"LC;"}, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals(
+        "Invalid Invalid stack frame value (must be an internal class name): LC;",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitFrame_illegalPrimitiveType() {
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitInsn(NOP);
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {new Integer(0)}, 0, null));
-    checkMethodAdapter.visitInsn(NOP);
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {new Float(0.0f)}, 0, null));
+    Integer invalidFrameValue =
+        new Integer(0); // NOPMD(IntegerInstantiation): needed to build an invalid value.
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {invalidFrameValue}, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Invalid stack frame value: 0", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMixedFrameTypes() {
+  public void testVisitFrame_illegalValueClass() {
+    checkMethodAdapter.visitCode();
+    checkMethodAdapter.visitInsn(NOP);
+
+    Executable visitFrame =
+        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {new Float(0.0f)}, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Invalid stack frame value: 0.0", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitFrame_illegalMixedFrameTypes() {
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitFrame(F_NEW, 0, null, 0, null);
     checkMethodAdapter.visitInsn(NOP);
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFrame(F_FULL, 0, null, 0, null));
+
+    Executable visitFrame = () -> checkMethodAdapter.visitFrame(F_FULL, 0, null, 0, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
+    assertEquals("Expanded and compressed frames must not be mixed.", exception.getMessage());
   }
 
   @Test
-  public void testIllegalIntInsn() {
+  public void testVisitInsn_beforeStart() {
+    Executable visitInsn = () -> checkMethodAdapter.visitInsn(NOP);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitInsn);
+    assertEquals(
+        "Cannot visit instructions before visitCode has been called.", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitInsn_IllegalInsnVisitAfterEnd() {
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitIntInsn(-1, 0));
+    checkMethodAdapter.visitMaxs(0, 0);
+
+    Executable visitInsn = () -> checkMethodAdapter.visitInsn(NOP);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitInsn);
+    assertEquals(
+        "Cannot visit instructions after visitMaxs has been called.", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsn() {
+  public void testVisitIntInsn_illegalOpcode() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitMethodInsn(-1, "o", "m", "()V"));
+
+    Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(-1, 0);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitIntInsn);
+    assertEquals("Invalid opcode: -1", exception.getMessage());
   }
 
   @Test
-  public void testIllegalInvokeDynamicInsn() {
+  public void testVisitIntInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () ->
-            checkMethodAdapter.visitInvokeDynamicInsn(
-                "m", "()V", new Handle(Opcodes.GETFIELD, "o", "m", "()V", false)));
+
+    Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(NEWARRAY, 0);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitIntInsn);
+    assertEquals("Invalid operand (must be an array type code T_...): 0", exception.getMessage());
   }
 
   @Test
-  public void testIllegalByteInsnOperand() {
+  public void testVisitIntInsn_illegalByteOperand() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitIntInsn(BIPUSH, Integer.MAX_VALUE));
+
+    Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(BIPUSH, Integer.MAX_VALUE);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitIntInsn);
+    assertEquals("Invalid operand (must be a signed byte): 2147483647", exception.getMessage());
   }
 
   @Test
-  public void testIllegalShortInsnOperand() {
+  public void testVisitIntInsn_illegalShortOperand() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitIntInsn(SIPUSH, Integer.MAX_VALUE));
+
+    Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(SIPUSH, Integer.MAX_VALUE);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitIntInsn);
+    assertEquals("Invalid operand (must be a signed short): 2147483647", exception.getMessage());
   }
 
   @Test
-  public void testIllegalVarInsnOperand() {
+  public void testVisitVarInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitVarInsn(ALOAD, -1));
+
+    Executable visitVarInsn = () -> checkMethodAdapter.visitVarInsn(ALOAD, -1);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitVarInsn);
+    assertEquals(
+        "Invalid local variable index (must be an unsigned short): -1", exception.getMessage());
   }
 
   @Test
-  public void testIllegalIntInsnOperand() {
+  public void testVisitTypeInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitIntInsn(NEWARRAY, 0));
+
+    Executable visitTypeInsn = () -> checkMethodAdapter.visitTypeInsn(NEW, "[I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTypeInsn);
+    assertEquals("NEW cannot be used to create arrays: [I", exception.getMessage());
   }
 
   @Test
-  public void testIllegalTypeInsnOperand() {
+  public void testVisitFieldInsn_nullOwner() {
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitTypeInsn(NEW, "[I"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, null, "i", "I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid owner (must not be null or empty)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalLabelInsnOperand() {
+  public void testVisitFieldInsn_invalidOwnerDescriptor() {
     checkMethodAdapter.visitCode();
-    Label l = new Label();
-    checkMethodAdapter.visitLabel(l);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitLabel(l));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "-", "i", "I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid owner (must be an internal class name): -", exception.getMessage());
   }
 
   @Test
-  public void testIllegalDebugLabelUse() throws IOException {
-    ClassReader classReader = new ClassReader("java.lang.Object");
-    ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS);
-    ClassVisitor classVisitor =
-        new ClassVisitor(Opcodes.ASM7_EXPERIMENTAL, classWriter) {
-          @Override
-          public MethodVisitor visitMethod(
-              final int access,
-              final String name,
-              final String descriptor,
-              final String signature,
-              final String[] exceptions) {
-            final MethodVisitor next =
-                super.visitMethod(access, name, descriptor, signature, exceptions);
-            if (next == null) {
-              return next;
-            }
-            return new MethodVisitor(api, new CheckMethodAdapter(next)) {
-
-              private Label entryLabel = null;
-
-              @Override
-              public void visitLabel(final Label label) {
-                if (entryLabel == null) {
-                  entryLabel = label;
-                }
-                checkMethodAdapter.visitLabel(label);
-              }
-
-              @Override
-              public void visitMaxs(final int maxStack, final int maxLocals) {
-                Label unwindHandler = new Label();
-                checkMethodAdapter.visitLabel(unwindHandler);
-                checkMethodAdapter.visitInsn(Opcodes.ATHROW); // Re-throw.
-                checkMethodAdapter.visitTryCatchBlock(
-                    entryLabel, unwindHandler, unwindHandler, null);
-                checkMethodAdapter.visitMaxs(maxStack, maxLocals);
-              }
-            };
-          }
-        };
-    assertThrows(
-        RuntimeException.class, () -> classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES));
-  }
-
-  @Test
-  public void testIllegalTableSwitchParameters() {
+  public void testVisitFieldInsn_nullName() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTableSwitchInsn(1, 0, new Label(), new Label[0]));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, null, new Label[0]));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, new Label(), (Label[]) null));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, new Label(), new Label[0]));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", null, "I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid name (must not be null or empty)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalLookupSwitchParameters() {
+  public void testVisitFieldInsn_invalidFieldName() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), null, new Label[0]));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), new int[0], null));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), new int[0], new Label[1]));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "-", "I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid name (must be a valid Java identifier): -", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnNullOwner() {
+  public void testVisitFieldInsn_invalidFieldName2() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, null, "i", "I"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "a-", "I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid name (must be a valid Java identifier): a-", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnOwner() {
+  public void testVisitFieldInsn_nullDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "-", "i", "I"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid type descriptor (must not be null or empty)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnNullName() {
+  public void testVisitFieldInsn_voidDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", null, "I"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "V");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid descriptor: V", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnName() {
+  public void testVisitFieldInsn_invalidPrimitiveDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "-", "I"));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "a-", "I"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "II");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid descriptor: II", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnNullDesc() {
+  public void testVisitFieldInsn_illegalArrayDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", null));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "[");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid descriptor: [", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnVoidDesc() {
+  public void testVisitFieldInsn_invalidReferenceDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "V"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid descriptor: L", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnPrimitiveDesc() {
+  public void testVisitFieldInsn_invalidReferenceDescriptor2() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "II"));
+
+    Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L-;");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitFieldInsn);
+    assertEquals("Invalid descriptor: L-;", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnArrayDesc() {
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedVisitMethodInsn_invalidOpcode() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "["));
+
+    Executable visitMethodInsn = () -> checkMethodAdapter.visitMethodInsn(42, "o", "m", "()V");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid opcode: 42", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldInsnReferenceDesc() {
+  public void testVisitMethodInsn_invalidOpcode() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L"));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L-;"));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(42, "o", "m", "()V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid opcode: 42", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnNullName() {
+  public void testVisitMethodInsn_nullName() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", null, "()V", false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", null, "()V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid name (must not be null or empty)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnName() {
+  public void testVisitMethodInsn_invalidName() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "-", "()V", false));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "a-", "()V", false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "-", "()V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals(
+        "Invalid name (must be a '<init>', '<clinit>' or a valid Java identifier): -",
+        exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnNullDesc() {
+  public void testVisitMethodInsn_invalidName2() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", null, false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "a-", "()V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals(
+        "Invalid name (must be a '<init>', '<clinit>' or a valid Java identifier): a-",
+        exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnDesc() {
+  public void testVisitMethodInsn_nullDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "I", false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", null, false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid method descriptor (must not be null or empty)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnParameterDesc() {
+  public void testVisitMethodInsn_invalidDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "(V)V", false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "I", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid descriptor: I", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnReturnDesc() {
+  public void testVisitMethodInsn_invalidParameterDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "()VV", false));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "(V)V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid descriptor: (V)V", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnItf() {
+  public void testVisitMethodInsn_invalidReturnDescriptor() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEINTERFACE, "C", "m", "()V", false));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "()V", true));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "()VV", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("Invalid descriptor: ()VV", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMethodInsnItf2() {
+  public void testVisitMethodInsn_illegalInvokeInterface() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEINTERFACE, "C", "m", "()V", false);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("INVOKEINTERFACE can't be used with classes", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMethodInsn_illegalInvokeInterface2() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKEVIRTUAL, "C", "m", "()V", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals("INVOKEVIRTUAL can't be used with interfaces", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMethodInsn_illegalInvokeSpecial() {
     checkMethodAdapter.version = Opcodes.V1_7;
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitMethodInsn(INVOKESPECIAL, "C", "m", "()V", true));
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKESPECIAL, "C", "m", "()V", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
+    assertEquals(
+        "INVOKESPECIAL can't be used with interfaces prior to Java 8", exception.getMessage());
   }
 
   @Test
-  public void testMethodInsnItf() {
+  public void testVisitMethodInsn_invokeSpecialOnInterface() {
     checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitMethodInsn(INVOKESPECIAL, "C", "m", "()V", true);
+
+    Executable visitMethodInsn =
+        () -> checkMethodAdapter.visitMethodInsn(INVOKESPECIAL, "C", "m", "()V", true);
+
+    assertDoesNotThrow(visitMethodInsn);
   }
 
   @Test
-  public void testIllegalLdcInsnOperand() {
+  public void testVisitInvokeDynamicInsn_illegalHandleTag() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitInvokeDynamicInsn =
+        () ->
+            checkMethodAdapter.visitInvokeDynamicInsn(
+                "m", "()V", new Handle(Opcodes.GETFIELD, "o", "m", "()V", false));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitInvokeDynamicInsn);
+    assertEquals("invalid handle tag 180", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLabel_alreadyVisitedLabel() {
+    Label label = new Label();
+    checkMethodAdapter.visitCode();
+    checkMethodAdapter.visitLabel(label);
+
+    Executable visitLabel = () -> checkMethodAdapter.visitLabel(label);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLabel);
+    assertEquals("Already visited label", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLdcInsn_v11_illegalOperandType() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitLdcInsn(new Object()));
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitLdcInsn(Type.getType("I")));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitLdcInsn(Type.getObjectType("I")));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitLdcInsn(Type.getMethodType("()V")));
-    assertThrows(
-        RuntimeException.class,
-        () ->
-            checkMethodAdapter.visitLdcInsn(new Handle(Opcodes.GETFIELD, "o", "m", "()V", false)));
 
+    Executable visitLdcInsn = () -> checkMethodAdapter.visitLdcInsn(new Object());
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertTrue(exception.getMessage().startsWith("Invalid constant: java.lang.Object@"));
+  }
+
+  @Test
+  public void testVisitLdcInsn_v11_primitiveDescriptor() {
+    checkMethodAdapter.version = Opcodes.V1_1;
+    checkMethodAdapter.visitCode();
+
+    Executable visitLdcInsn = () -> checkMethodAdapter.visitLdcInsn(Type.getType("I"));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals("Illegal LDC constant value", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLdcInsn_v11_illegalConstantClass() {
+    checkMethodAdapter.version = Opcodes.V1_1;
+    checkMethodAdapter.visitCode();
+
+    Executable visitLdcInsn = () -> checkMethodAdapter.visitLdcInsn(Type.getObjectType("I"));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals("ldc of a constant class requires at least version 1.5", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLdcInsn_v11_methodDescriptor() {
+    checkMethodAdapter.version = Opcodes.V1_1;
+    checkMethodAdapter.visitCode();
+
+    Executable visitLdcInsn = () -> checkMethodAdapter.visitLdcInsn(Type.getMethodType("()V"));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals("ldc of a method type requires at least version 1.7", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLdcInsn_v11_handle() {
+    checkMethodAdapter.version = Opcodes.V1_1;
+    checkMethodAdapter.visitCode();
+
+    Executable visitLdcInsn =
+        () -> checkMethodAdapter.visitLdcInsn(new Handle(Opcodes.GETFIELD, "o", "m", "()V", false));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals("ldc of a Handle requires at least version 1.7", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLdcInsn_v18_invalidHandleTag() {
     checkMethodAdapter.version = Opcodes.V1_8;
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitLdcInsn(new Handle(-1, "o", "m", "()V", false)));
+    checkMethodAdapter.visitCode();
+
+    Executable visitLdcInsn =
+        () -> checkMethodAdapter.visitLdcInsn(new Handle(-1, "o", "m", "()V", false));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals("invalid handle tag -1", exception.getMessage());
   }
 
   @Test
-  public void testIllegalMultiANewArrayDesc() {
+  public void testVisitLdcInsn_v18_handle() {
+    checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitMultiANewArrayInsn("I", 1));
+
+    Executable visitLdcInsn =
+        () ->
+            checkMethodAdapter.visitLdcInsn(
+                new Handle(Opcodes.H_NEWINVOKESPECIAL, "o", "<init>", "()V", false));
+
+    assertDoesNotThrow(visitLdcInsn);
   }
 
   @Test
-  public void testIllegalMultiANewArrayDims() {
+  public void testVisitLdcInsn_v18_illegalHandleName() {
+    checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 0));
-    assertThrows(
-        RuntimeException.class, () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 3));
+
+    Executable visitLdcInsn =
+        () ->
+            checkMethodAdapter.visitLdcInsn(
+                new Handle(Opcodes.H_INVOKEVIRTUAL, "o", "<init>", "()V", false));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLdcInsn);
+    assertEquals(
+        "Invalid handle name (must be a valid unqualified name): <init>", exception.getMessage());
   }
 
   @Test
-  public void testIllegalInsnAnnotation() {
+  public void testVisitTableSwitchInsn_invalidMinMax() {
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
+
+    Executable visitTableSwitchInsn =
+        () -> checkMethodAdapter.visitTableSwitchInsn(1, 0, new Label(), new Label[0]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTableSwitchInsn);
+    assertEquals("Max = 0 must be greater than or equal to min = 1", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitTableSwitchInsn_invalidDefaultLabel() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitTableSwitchInsn =
+        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, null, new Label[0]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTableSwitchInsn);
+    assertEquals("Invalid default label (must not be null)", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitTableSwitchInsn_nullKeyLabels() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitTableSwitchInsn =
+        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, new Label(), (Label[]) null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTableSwitchInsn);
+    assertEquals("There must be max - min + 1 labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitTableSwitchInsn_invalidKeyLabelCount() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitTableSwitchInsn =
+        () -> checkMethodAdapter.visitTableSwitchInsn(0, 1, new Label(), new Label[0]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTableSwitchInsn);
+    assertEquals("There must be max - min + 1 labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLookupSwitchInsn_nullKeyArray_oneLabel() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLookupSwitchInsn =
+        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), null, new Label[0]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLookupSwitchInsn);
+    assertEquals("There must be the same number of keys and labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLookupSwitchInsn_noKey_nullLabelArray() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLookupSwitchInsn =
+        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), new int[0], null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLookupSwitchInsn);
+    assertEquals("There must be the same number of keys and labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLookupSwitchInsn_noKey_oneNullLabel() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLookupSwitchInsn =
+        () -> checkMethodAdapter.visitLookupSwitchInsn(new Label(), new int[0], new Label[1]);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLookupSwitchInsn);
+    assertEquals("There must be the same number of keys and labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMultiANewArrayInsn_invalidDescriptor() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("I", 1);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMultiANewArrayInsn);
+    assertEquals(
+        "Invalid descriptor (must be an array type descriptor): I", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMultiANewArrayInsn_notEnoughDimensions() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 0);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMultiANewArrayInsn);
+    assertEquals("Invalid dimensions (must be greater than 0): 0", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMultiANewArrayInsn_tooManyDimensions() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 3);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMultiANewArrayInsn);
+    assertEquals(
+        "Invalid dimensions (must not be greater than numDimensions(descriptor)): 3",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitInsnAnnotation_invalidTypeReference() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitInsnAnnotation =
         () ->
             checkMethodAdapter.visitInsnAnnotation(
-                TypeReference.newSuperTypeReference(0).getValue(), null, "LA;", true));
+                TypeReference.newSuperTypeReference(0).getValue(), null, "LA;", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitInsnAnnotation);
+    assertEquals("Invalid type reference sort 0x10", exception.getMessage());
   }
 
   @Test
-  public void testIllegalTryCatchBlock() {
-    checkMethodAdapter.visitCode();
+  public void testVisitTryCatchBlock_afterStartLabel() {
     Label label0 = new Label();
     Label label1 = new Label();
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitLabel(label0);
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTryCatchBlock(label0, label1, label1, null));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTryCatchBlock(label1, label0, label1, null));
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitTryCatchBlock(label1, label1, label0, null));
+
+    Executable visitTryCatchBlock =
+        () -> checkMethodAdapter.visitTryCatchBlock(label0, label1, label1, null);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitTryCatchBlock);
+    assertEquals("Try catch blocks must be visited before their labels", exception.getMessage());
   }
 
   @Test
-  public void testIllegalTryCatchAnnotation() {
+  public void testVisitTryCatchBlock_afterEndLabel() {
+    Label label0 = new Label();
+    Label label1 = new Label();
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
+    checkMethodAdapter.visitLabel(label0);
+
+    Executable visitTryCatchBlock =
+        () -> checkMethodAdapter.visitTryCatchBlock(label1, label0, label1, null);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitTryCatchBlock);
+    assertEquals("Try catch blocks must be visited before their labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitTryCatchBlock_afterHandlerLabel() {
+    Label label0 = new Label();
+    Label label1 = new Label();
+    checkMethodAdapter.visitCode();
+    checkMethodAdapter.visitLabel(label0);
+
+    Executable visitTryCatchBlock =
+        () -> checkMethodAdapter.visitTryCatchBlock(label1, label1, label0, null);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitTryCatchBlock);
+    assertEquals("Try catch blocks must be visited before their labels", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitTryCatchAnnotation_invalidTypeReference() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitTryCatchAnnotation =
         () ->
             checkMethodAdapter.visitTryCatchAnnotation(
-                TypeReference.newSuperTypeReference(0).getValue(), null, "LA;", true));
+                TypeReference.newSuperTypeReference(0).getValue(), null, "LA;", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTryCatchAnnotation);
+    assertEquals("Invalid type reference sort 0x10", exception.getMessage());
   }
 
   @Test
-  public void testIllegalLocalVariableAnnotation() {
+  public void testVisitLocalVariable_invalidRange() {
+    Label startLabel = new Label();
+    Label endLabel = new Label();
     checkMethodAdapter.visitCode();
-    assertThrows(
-        RuntimeException.class,
+    checkMethodAdapter.visitLabel(startLabel);
+    checkMethodAdapter.visitInsn(NOP);
+    checkMethodAdapter.visitLabel(endLabel);
+
+    Executable visitLocalVariable =
+        () -> checkMethodAdapter.visitLocalVariable("i", "I", null, endLabel, startLabel, 0);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLocalVariable);
+    assertEquals(
+        "Invalid start and end labels (end must be greater than start)", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_invalidTypeReference() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.newSuperTypeReference(0).getValue(),
@@ -557,9 +903,18 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 new Label[0],
                 new int[0],
                 "LA;",
-                true));
-    assertThrows(
-        RuntimeException.class,
+                true);
+
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals("Invalid type reference sort 0x10", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_nullStart_noEnd_noIndex() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.LOCAL_VARIABLE << 24,
@@ -568,9 +923,20 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 new Label[0],
                 new int[0],
                 "LA;",
-                true));
-    assertThrows(
-        RuntimeException.class,
+                true);
+
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals(
+        "Invalid start, end and index arrays (must be non null and of identical length",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_noStart_nullEnd_noIndex() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.LOCAL_VARIABLE << 24,
@@ -579,9 +945,20 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 null,
                 new int[0],
                 "LA;",
-                true));
-    assertThrows(
-        RuntimeException.class,
+                true);
+
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals(
+        "Invalid start, end and index arrays (must be non null and of identical length",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_noStart_oneNullEnd_noIndex() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.LOCAL_VARIABLE << 24,
@@ -590,9 +967,20 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 new Label[1],
                 new int[0],
                 "LA;",
-                true));
-    assertThrows(
-        RuntimeException.class,
+                true);
+
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals(
+        "Invalid start, end and index arrays (must be non null and of identical length",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_noStart_noEnd_oneIndex() {
+    checkMethodAdapter.visitCode();
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.RESOURCE_VARIABLE << 24,
@@ -601,15 +989,25 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 new Label[0],
                 new int[1],
                 "LA;",
-                true));
+                true);
 
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals(
+        "Invalid start, end and index arrays (must be non null and of identical length",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testVisitLocalVariableAnnotation_invalidRange() {
     Label startLabel = new Label();
+    Label endLabel = new Label();
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitLabel(startLabel);
     checkMethodAdapter.visitInsn(NOP);
-    Label endLabel = new Label();
     checkMethodAdapter.visitLabel(endLabel);
-    assertThrows(
-        RuntimeException.class,
+
+    Executable visitLocalVariableAnnotation =
         () ->
             checkMethodAdapter.visitLocalVariableAnnotation(
                 TypeReference.RESOURCE_VARIABLE << 24,
@@ -618,87 +1016,120 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
                 new Label[] {startLabel},
                 new int[1],
                 "LA;",
-                true));
+                true);
+
+    Exception exception =
+        assertThrows(IllegalArgumentException.class, visitLocalVariableAnnotation);
+    assertEquals(
+        "Invalid start and end labels (end must be greater than start)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalDataflow() {
-    MethodVisitor checkMethodAdapter =
-        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)V", null, new HashMap<>());
+  public void testVisitLineNumber_beforeLabel() {
     checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitVarInsn(ILOAD, 1);
-    checkMethodAdapter.visitInsn(IRETURN);
-    checkMethodAdapter.visitMaxs(1, 2);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitEnd());
+
+    Executable visitLineNumber = () -> checkMethodAdapter.visitLineNumber(0, new Label());
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitLineNumber);
+    assertEquals("Invalid start label (must be visited first)", exception.getMessage());
   }
 
   @Test
-  public void testIllegalDataflobjectweb() {
-    MethodVisitor checkMethodAdapter =
-        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", null, new HashMap<>());
-    checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitInsn(RETURN);
-    checkMethodAdapter.visitMaxs(0, 2);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitEnd());
-  }
-
-  @Test
-  public void testIllegalLocalVariableLabels() {
-    checkMethodAdapter.visitCode();
-    Label startLabel = new Label();
-    checkMethodAdapter.visitLabel(startLabel);
-    checkMethodAdapter.visitInsn(NOP);
-    Label endLabel = new Label();
-    checkMethodAdapter.visitLabel(endLabel);
-    assertThrows(
-        RuntimeException.class,
-        () -> checkMethodAdapter.visitLocalVariable("i", "I", null, endLabel, startLabel, 0));
-  }
-
-  @Test
-  public void testIllegalLineNumerLabel() {
-    checkMethodAdapter.visitCode();
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitLineNumber(0, new Label()));
-  }
-
-  @Test
-  public void testIllegalLabelNotVisited() {
-    checkMethodAdapter.visitCode();
+  public void testVisitMaxs_unvisitedJumpLabels() {
     Label label = new Label();
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitJumpInsn(IFEQ, label);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitMaxs(0, 0));
+
+    Executable visitMaxs = () -> checkMethodAdapter.visitMaxs(0, 0);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitMaxs);
+    assertEquals("Undefined label used", exception.getMessage());
   }
 
   @Test
-  public void testIllegalTryCatchLabelNotVisited() {
-    checkMethodAdapter.visitCode();
+  public void testVisitMaxs_unvisitedTryCatchLabels() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     Label handlerLabel = new Label();
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitTryCatchBlock(startLabel, endLabel, handlerLabel, "E");
     checkMethodAdapter.visitLabel(endLabel);
     checkMethodAdapter.visitLabel(handlerLabel);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitMaxs(0, 0));
+
+    Executable visitMaxs = () -> checkMethodAdapter.visitMaxs(0, 0);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitMaxs);
+    assertEquals("Undefined try catch block labels", exception.getMessage());
   }
 
   @Test
-  public void testIllegalTryCatchLabelOrder() {
-    checkMethodAdapter.visitCode();
+  public void testVisitMaxs_invalidTryCatchRange() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     Label handlerLabel = new Label();
+    checkMethodAdapter.visitCode();
     checkMethodAdapter.visitTryCatchBlock(endLabel, startLabel, handlerLabel, "E");
     checkMethodAdapter.visitLabel(startLabel);
     checkMethodAdapter.visitInsn(NOP);
     checkMethodAdapter.visitLabel(endLabel);
     checkMethodAdapter.visitLabel(handlerLabel);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitMaxs(0, 0));
+
+    Executable visitMaxs = () -> checkMethodAdapter.visitMaxs(0, 0);
+
+    Exception exception = assertThrows(IllegalStateException.class, visitMaxs);
+    assertEquals("Emty try catch block handler range", exception.getMessage());
   }
 
   @Test
-  public void testIllegalInsnVisitAfterEnd() {
-    checkMethodAdapter.visitCode();
-    checkMethodAdapter.visitMaxs(0, 0);
-    assertThrows(RuntimeException.class, () -> checkMethodAdapter.visitInsn(NOP));
+  public void testVisitEnd_invalidDataFlow() {
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", null, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitInsn(RETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(0, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
+    assertTrue(
+        exception
+            .getMessage()
+            .startsWith("Error at instruction 0: Incompatible return type m(I)I"));
+  }
+
+  @Test
+  public void testVisitEnd_invalidReturnType() {
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)V", null, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(1, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
+    assertTrue(
+        exception
+            .getMessage()
+            .startsWith(
+                "Error at instruction 1: Incompatible return type: expected null, but found I m(I)V"));
+  }
+
+  @Test
+  public void testVisitEnd_dataflowCheckRequiresMaxLocalsAndMaxStack() {
+    CheckMethodAdapter dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(0, "m", "()V", null, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ALOAD, 0);
+    dataFlowCheckMethodAdapter.visitInsn(RETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(0, 0);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
+    assertEquals(
+        "Data flow checking option requires valid, non zero maxLocals and maxStack.",
+        exception.getMessage());
   }
 }

@@ -27,8 +27,8 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.commons;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.objectweb.asm.test.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -39,9 +39,10 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.test.AsmTest;
+import org.objectweb.asm.test.ClassFile;
 
 /**
- * TryCatchBlockSorter tests.
+ * Unit tests for {@link TryCatchBlockSorter}.
  *
  * @author Eric Bruneton
  */
@@ -49,7 +50,8 @@ public class TryCatchBlockSorterTest extends AsmTest {
 
   @Test
   public void testConstructor() {
-    new TryCatchBlockSorter(null, Opcodes.ACC_PUBLIC, "name", "()V", null, null);
+    assertDoesNotThrow(
+        () -> new TryCatchBlockSorter(null, Opcodes.ACC_PUBLIC, "name", "()V", null, null));
     assertThrows(
         IllegalStateException.class,
         () -> new TryCatchBlockSorter(null, Opcodes.ACC_PUBLIC, "name", "()V", null, null) {});
@@ -57,7 +59,7 @@ public class TryCatchBlockSorterTest extends AsmTest {
 
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_LATEST_API)
-  public void testSortTryCatchBlocksAndInstantiate(
+  public void testAllMethods_precompileClass(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassWriter classWriter = new ClassWriter(0);
@@ -81,8 +83,13 @@ public class TryCatchBlockSorterTest extends AsmTest {
         };
 
     classReader.accept(classVisitor, 0);
-    assertThat(() -> loadAndInstantiate(classParameter.getName(), classWriter.toByteArray()))
-        .succeedsOrThrows(UnsupportedClassVersionError.class)
-        .when(classParameter.isMoreRecentThanCurrentJdk());
+
+    if (classParameter.isMoreRecentThanCurrentJdk()) {
+      assertThrows(
+          UnsupportedClassVersionError.class,
+          () -> new ClassFile(classWriter.toByteArray()).newInstance());
+    } else {
+      assertDoesNotThrow(() -> new ClassFile(classWriter.toByteArray()).newInstance());
+    }
   }
 }

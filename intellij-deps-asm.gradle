@@ -1,7 +1,7 @@
 //[JB] The script renames ASM packages using the given prefix, merges modules into "fat" artifacts, and publishes them.
 //[JB] Relies on build artifacts, so run `gradle jar` first.
 
-plugins { id 'com.jfrog.bintray' version '1.8.0' }
+plugins { id 'com.jfrog.bintray' version '1.8.4' }
 
 apply plugin: 'maven-publish'
 
@@ -15,7 +15,7 @@ configure(project) {
   project.ext.prefix = project.ext.properties.get('intellij.asm.prefix', 'org.jetbrains')
   project.ext.dirPrefix = project.ext.prefix.replace('.', '/')
 
-  def moduleNames = project.ext.properties.get('intellij.asm.modules', 'commons,tree,analysis,xml,util') as String
+  def moduleNames = project.ext.properties.get('intellij.asm.modules', 'commons,tree,analysis,util') as String
   def modules = ['asm'] + moduleNames.split(',').findAll { !it.isEmpty() }.collect { "asm-${it}" }
 
   project.ext.jarFiles = []
@@ -57,7 +57,8 @@ task('fatJar') {
 }
 
 task('fatSources', type: Zip) {
-  archiveName project.ext.srcFile as String
+  archiveFileName = project.ext.srcFile
+  destinationDirectory = file("$projectDir")
   from project.ext.srcDirs as File[]
   filter { it.replace('org.objectweb.asm', "${project.ext.prefix}.org.objectweb.asm") }
   into project.ext.dirPrefix

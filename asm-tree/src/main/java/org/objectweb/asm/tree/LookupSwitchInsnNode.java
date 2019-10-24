@@ -29,7 +29,6 @@ package org.objectweb.asm.tree;
 
 import java.util.List;
 import java.util.Map;
-
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -55,8 +54,8 @@ public class LookupSwitchInsnNode extends AbstractInsnNode {
    *
    * @param dflt beginning of the default handler block.
    * @param keys the values of the keys.
-   * @param labels beginnings of the handler blocks. <tt>labels[i]</tt> is the beginning of the
-   *     handler block for the <tt>keys[i]</tt> key.
+   * @param labels beginnings of the handler blocks. {@code labels[i]} is the beginning of the
+   *     handler block for the {@code keys[i]} key.
    */
   public LookupSwitchInsnNode(final LabelNode dflt, final int[] keys, final LabelNode[] labels) {
     super(Opcodes.LOOKUPSWITCH);

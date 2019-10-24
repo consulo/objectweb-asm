@@ -416,7 +416,7 @@ fld public final static java.lang.Integer NULL
 fld public final static java.lang.Integer TOP
 fld public final static java.lang.Integer UNINITIALIZED_THIS
 
-CLSS public org.objectweb.asm.Type
+CLSS public final org.objectweb.asm.Type
 fld public final static int ARRAY = 9
 fld public final static int BOOLEAN = 1
 fld public final static int BYTE = 3
@@ -472,7 +472,7 @@ meth public static org.objectweb.asm.Type[] getArgumentTypes(java.lang.reflect.M
 supr java.lang.Object
 hfds a,b,c,d
 
-CLSS public org.objectweb.asm.TypePath
+CLSS public final org.objectweb.asm.TypePath
 fld public final static int ARRAY_ELEMENT = 0
 fld public final static int INNER_TYPE = 1
 fld public final static int TYPE_ARGUMENT = 3

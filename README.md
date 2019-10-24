@@ -2,9 +2,9 @@
 
 The repository contains a fork of [ASM library](https://gitlab.ow2.org/asm/asm) with a couple of IntelliJ-specific patches on top (see commits).
 
-### Updating the repository on a new ASM release
+### Updating the repository to a new ASM release
 
-1. First, pay a visit to a [Tags](https://gitlab.ow2.org/asm/asm/tags) page to make sure there is a tag
+1. First, visit the [Tags](https://gitlab.ow2.org/asm/asm/tags) page to find a tag
 corresponding to the desired release (for example, `ASM_6_2`).
 
 2. Then make sure your local copy of the repository is up to date. If you don't have the local copy yet,
@@ -24,4 +24,5 @@ just clone the repository, otherwise "cd" into that directory and execute `git f
 
 2. Assemble artifacts: `./gradle/gradlew clean jar -Prelease ; ./gradle/gradlew -b intellij-deps-asm.gradle fatJar fatSources`.
 
-3. Remote run (TBD)
+3. Use the artifacts to test IDEA's compatibility with the new release - e.g. add them to the project
+as "ASM" library roots and remote run all relevant build configurations (there are quite a few).

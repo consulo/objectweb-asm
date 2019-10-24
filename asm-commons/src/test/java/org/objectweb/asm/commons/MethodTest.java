@@ -29,23 +29,23 @@ package org.objectweb.asm.commons;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.Type;
 
 /**
- * Method tests.
+ * Unit tests for {@link Method}.
  *
  * @author Eric Bruneton
  */
 public class MethodTest {
 
   @Test
-  public void testConstructor1() {
+  public void testConstructor_fromDescriptor() {
     Method method = new Method("name", "(I)J");
+
     assertEquals("name", method.getName());
     assertEquals("(I)J", method.getDescriptor());
     assertEquals(Type.LONG_TYPE, method.getReturnType());
@@ -54,8 +54,9 @@ public class MethodTest {
   }
 
   @Test
-  public void testConstructor2() {
+  public void testConstructor_fromTypes() {
     Method method = new Method("name", Type.LONG_TYPE, new Type[] {Type.INT_TYPE});
+
     assertEquals("name", method.getName());
     assertEquals("(I)J", method.getDescriptor());
     assertEquals(Type.LONG_TYPE, method.getReturnType());
@@ -64,52 +65,58 @@ public class MethodTest {
   }
 
   @Test
-  public void testGetReflectMethod() throws NoSuchMethodException, SecurityException {
+  public void testGetMethod_fromMethodObject() throws ReflectiveOperationException {
     Method method = Method.getMethod(Object.class.getMethod("equals", Object.class));
+
     assertEquals("equals", method.getName());
     assertEquals("(Ljava/lang/Object;)Z", method.getDescriptor());
   }
 
   @Test
-  public void testGetReflectConstructor() throws NoSuchMethodException, SecurityException {
+  public void testGetMethod_fromConstructorObject() throws ReflectiveOperationException {
     Method method = Method.getMethod(Object.class.getConstructor());
+
     assertEquals("<init>", method.getName());
     assertEquals("()V", method.getDescriptor());
   }
 
   @Test
-  public void testGetMethod() throws NoSuchMethodException, SecurityException {
+  public void testGetMethod_fromDescriptor() {
     Method method =
         Method.getMethod(
             "boolean name(byte, char, short, int, float, long, double, pkg.Class, pkg.Class[])");
+
     assertEquals("name", method.getName());
     assertEquals("(BCSIFJDLpkg/Class;[Lpkg/Class;)Z", method.getDescriptor());
-    
+  }
+
+  @Test
+  public void testGetMethod_fromInvalidDescriptor() {
     assertThrows(IllegalArgumentException.class, () -> Method.getMethod("name()"));
     assertThrows(IllegalArgumentException.class, () -> Method.getMethod("void name"));
     assertThrows(IllegalArgumentException.class, () -> Method.getMethod("void name(]"));
   }
 
   @Test
-  public void testGetMethodWithDefaultPackage() throws NoSuchMethodException, SecurityException {
-    assertEquals(
-        "(Ljava/lang/Object;)V",
-        Method.getMethod("void name(Object)", /* defaultPackage= */ false).getDescriptor());
-    assertEquals(
-        "(LObject;)V",
-        Method.getMethod("void name(Object)", /* defaultPackage= */ true).getDescriptor());
+  public void testGetMethod_withDefaultPackage() {
+    Method withoutDefaultPackage =
+        Method.getMethod("void name(Object)", /* defaultPackage= */ false);
+    Method withDefaultPackage = Method.getMethod("void name(Object)", /* defaultPackage= */ true);
+
+    assertEquals("(Ljava/lang/Object;)V", withoutDefaultPackage.getDescriptor());
+    assertEquals("(LObject;)V", withDefaultPackage.getDescriptor());
   }
 
   @Test
   public void testEquals() {
-    assertFalse(new Method("name", "()V").equals(null));
-    assertFalse(new Method("name", "()V").equals(new Method("other", "()V")));
-    assertFalse(new Method("name", "()V").equals(new Method("name", "(I)J")));
-    assertTrue(new Method("name", "()V").equals(Method.getMethod("void name()")));
+    assertNotEquals(new Method("name", "()V"), null);
+    assertNotEquals(new Method("name", "()V"), new Method("other", "()V"));
+    assertNotEquals(new Method("name", "()V"), new Method("name", "(I)J"));
+    assertEquals(new Method("name", "()V"), Method.getMethod("void name()"));
   }
 
   @Test
   public void testHashCode() {
-    assertTrue(new Method("name", "()V").hashCode() != 0);
+    assertNotEquals(0, new Method("name", "()V").hashCode());
   }
 }

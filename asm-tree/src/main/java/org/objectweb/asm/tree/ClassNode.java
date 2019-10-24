@@ -29,7 +29,6 @@ package org.objectweb.asm.tree;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassVisitor;
@@ -61,12 +60,12 @@ public class ClassNode extends ClassVisitor {
   /** The internal name of this class (see {@link org.objectweb.asm.Type#getInternalName}). */
   public String name;
 
-  /** The signature of this class. May be <tt>null</tt>. */
+  /** The signature of this class. May be {@literal null}. */
   public String signature;
 
   /**
    * The internal of name of the super class (see {@link org.objectweb.asm.Type#getInternalName}).
-   * For interfaces, the super class is {@link Object}. May be <tt>null</tt>, but only for the
+   * For interfaces, the super class is {@link Object}. May be {@literal null}, but only for the
    * {@link Object} class.
    */
   public String superName;
@@ -77,63 +76,55 @@ public class ClassNode extends ClassVisitor {
    */
   public List<String> interfaces;
 
-  /** The name of the source file from which this class was compiled. May be <tt>null</tt>. */
+  /** The name of the source file from which this class was compiled. May be {@literal null}. */
   public String sourceFile;
 
   /**
-   * The correspondence between source and compiled elements of this class. May be <tt>null</tt>.
+   * The correspondence between source and compiled elements of this class. May be {@literal null}.
    */
   public String sourceDebug;
 
-  /** The module stored in this class. May be <tt>null</tt>. */
+  /** The module stored in this class. May be {@literal null}. */
   public ModuleNode module;
 
-  /** The internal name of the enclosing class of this class. May be <tt>null</tt>. */
+  /** The internal name of the enclosing class of this class. May be {@literal null}. */
   public String outerClass;
 
   /**
-   * The name of the method that contains this class, or <tt>null</tt> if this class is not enclosed
-   * in a method.
+   * The name of the method that contains this class, or {@literal null} if this class is not
+   * enclosed in a method.
    */
   public String outerMethod;
 
   /**
-   * The descriptor of the method that contains this class, or <tt>null</tt> if this class is not
+   * The descriptor of the method that contains this class, or {@literal null} if this class is not
    * enclosed in a method.
    */
   public String outerMethodDesc;
 
-  /** The runtime visible annotations of this class. May be <tt>null</tt>. */
+  /** The runtime visible annotations of this class. May be {@literal null}. */
   public List<AnnotationNode> visibleAnnotations;
 
-  /** The runtime invisible annotations of this class. May be <tt>null</tt>. */
+  /** The runtime invisible annotations of this class. May be {@literal null}. */
   public List<AnnotationNode> invisibleAnnotations;
 
-  /** The runtime visible type annotations of this class. May be <tt>null</tt>. */
+  /** The runtime visible type annotations of this class. May be {@literal null}. */
   public List<TypeAnnotationNode> visibleTypeAnnotations;
 
-  /** The runtime invisible type annotations of this class. May be <tt>null</tt>. */
+  /** The runtime invisible type annotations of this class. May be {@literal null}. */
   public List<TypeAnnotationNode> invisibleTypeAnnotations;
 
-  /** The non standard attributes of this class. May be <tt>null</tt>. */
+  /** The non standard attributes of this class. May be {@literal null}. */
   public List<Attribute> attrs;
 
   /** The inner classes of this class. */
   public List<InnerClassNode> innerClasses;
 
-  /**
-   * <b>Experimental, use at your own risk. This field will be renamed when it becomes stable, this
-   * will break existing code using it</b>. The internal name of the nest host class of this class.
-   * May be <tt>null</tt>.
-   */
-  public String nestHostClassExperimental;
+  /** The internal name of the nest host class of this class. May be {@literal null}. */
+  public String nestHostClass;
 
-  /**
-   * <b>Experimental, use at your own risk. This field will be renamed when it becomes stable, this
-   * will break existing code using it</b>. The internal names of the nest members of this class.
-   * May be <tt>null</tt>.
-   */
-  public List<String> nestMembersExperimental;
+  /** The internal names of the nest members of this class. May be {@literal null}. */
+  public List<String> nestMembers;
 
   /** The fields of this class. */
   public List<FieldNode> fields;
@@ -148,7 +139,7 @@ public class ClassNode extends ClassVisitor {
    * @throws IllegalStateException If a subclass calls this constructor.
    */
   public ClassNode() {
-    this(Opcodes.ASM6);
+    this(Opcodes.ASM7);
     if (getClass() != ClassNode.class) {
       throw new IllegalStateException();
     }
@@ -158,14 +149,14 @@ public class ClassNode extends ClassVisitor {
    * Constructs a new {@link ClassNode}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    */
   public ClassNode(final int api) {
     super(api);
-    this.interfaces = new ArrayList<String>();
-    this.innerClasses = new ArrayList<InnerClassNode>();
-    this.fields = new ArrayList<FieldNode>();
-    this.methods = new ArrayList<MethodNode>();
+    this.interfaces = new ArrayList<>();
+    this.innerClasses = new ArrayList<>();
+    this.fields = new ArrayList<>();
+    this.methods = new ArrayList<>();
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -201,8 +192,8 @@ public class ClassNode extends ClassVisitor {
   }
 
   @Override
-  public void visitNestHostExperimental(final String nestHost) {
-    this.nestHostClassExperimental = nestHost;
+  public void visitNestHost(final String nestHost) {
+    this.nestHostClass = nestHost;
   }
 
   @Override
@@ -217,12 +208,12 @@ public class ClassNode extends ClassVisitor {
     AnnotationNode annotation = new AnnotationNode(descriptor);
     if (visible) {
       if (visibleAnnotations == null) {
-        visibleAnnotations = new ArrayList<AnnotationNode>(1);
+        visibleAnnotations = new ArrayList<>(1);
       }
       visibleAnnotations.add(annotation);
     } else {
       if (invisibleAnnotations == null) {
-        invisibleAnnotations = new ArrayList<AnnotationNode>(1);
+        invisibleAnnotations = new ArrayList<>(1);
       }
       invisibleAnnotations.add(annotation);
     }
@@ -235,12 +226,12 @@ public class ClassNode extends ClassVisitor {
     TypeAnnotationNode typeAnnotation = new TypeAnnotationNode(typeRef, typePath, descriptor);
     if (visible) {
       if (visibleTypeAnnotations == null) {
-        visibleTypeAnnotations = new ArrayList<TypeAnnotationNode>(1);
+        visibleTypeAnnotations = new ArrayList<>(1);
       }
       visibleTypeAnnotations.add(typeAnnotation);
     } else {
       if (invisibleTypeAnnotations == null) {
-        invisibleTypeAnnotations = new ArrayList<TypeAnnotationNode>(1);
+        invisibleTypeAnnotations = new ArrayList<>(1);
       }
       invisibleTypeAnnotations.add(typeAnnotation);
     }
@@ -250,17 +241,17 @@ public class ClassNode extends ClassVisitor {
   @Override
   public void visitAttribute(final Attribute attribute) {
     if (attrs == null) {
-      attrs = new ArrayList<Attribute>(1);
+      attrs = new ArrayList<>(1);
     }
     attrs.add(attribute);
   }
 
   @Override
-  public void visitNestMemberExperimental(final String nestMember) {
-    if (nestMembersExperimental == null) {
-      nestMembersExperimental = new ArrayList<String>();
+  public void visitNestMember(final String nestMember) {
+    if (nestMembers == null) {
+      nestMembers = new ArrayList<>();
     }
-    nestMembersExperimental.add(nestMember);
+    nestMembers.add(nestMember);
   }
 
   @Override
@@ -309,11 +300,10 @@ public class ClassNode extends ClassVisitor {
    * in more recent versions of the ASM API than the given version.
    *
    * @param api an ASM API version. Must be one of {@link Opcodes#ASM4}, {@link Opcodes#ASM5},
-   *     {@link Opcodes#ASM6} or {@link Opcodes#ASM7_EXPERIMENTAL}.
+   *     {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
    */
   public void check(final int api) {
-    if (api < Opcodes.ASM7_EXPERIMENTAL
-        && (nestHostClassExperimental != null || nestMembersExperimental != null)) {
+    if (api < Opcodes.ASM7 && (nestHostClass != null || nestMembers != null)) {
       throw new UnsupportedClassVersionException();
     }
     if (api < Opcodes.ASM6 && module != null) {
@@ -375,8 +365,8 @@ public class ClassNode extends ClassVisitor {
       module.accept(classVisitor);
     }
     // Visit the nest host class.
-    if (nestHostClassExperimental != null) {
-      classVisitor.visitNestHostExperimental(nestHostClassExperimental);
+    if (nestHostClass != null) {
+      classVisitor.visitNestHost(nestHostClass);
     }
     // Visit the outer class.
     if (outerClass != null) {
@@ -418,9 +408,9 @@ public class ClassNode extends ClassVisitor {
       }
     }
     // Visit the nest members.
-    if (nestMembersExperimental != null) {
-      for (int i = 0, n = nestMembersExperimental.size(); i < n; ++i) {
-        classVisitor.visitNestMemberExperimental(nestMembersExperimental.get(i));
+    if (nestMembers != null) {
+      for (int i = 0, n = nestMembers.size(); i < n; ++i) {
+        classVisitor.visitNestMember(nestMembers.get(i));
       }
     }
     // Visit the inner classes.

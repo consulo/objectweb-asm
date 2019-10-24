@@ -34,31 +34,20 @@ package org.objectweb.asm.benchmarks;
  */
 public abstract class Adapter {
 
-  /** The access flags, name, super class and interfaces of a class. */
-  public static class ClassInfo {
-
-    int access;
-    String name;
-    String superClass;
-    String[] interfaces;
-
-    public ClassInfo(
-        final int access, final String name, final String superClass, final String[] interfaces) {
-      this.access = access;
-      this.name = name;
-      this.superClass = superClass;
-      this.interfaces = interfaces;
-    }
-  }
-
-  /** @return the version of this class adapter, or an empty string if there is no version */
+  /**
+   * Returns the version of this class adapter.
+   *
+   * @return the version of this class adapter, or an empty string if there is no version.
+   */
   public String getVersion() {
     return "";
   }
 
   /**
+   * Returns the access flags, name, super class and interfaces of the given class.
+   *
    * @param classFile a JVMS ClassFile structure
-   * @return access flags, name, super class and interfaces of the given class.
+   * @return the access flags, name, super class and interfaces of the given class.
    */
   public ClassInfo getClassInfo(final byte[] classFile) {
     throw new UnsupportedOperationException();
@@ -126,5 +115,33 @@ public abstract class Adapter {
    */
   public byte[] readAndWriteWithObjectModel(final byte[] classFile) {
     throw new UnsupportedOperationException();
+  }
+
+  /** The access flags, name, super class and interfaces of a class. */
+  public static class ClassInfo {
+
+    int access;
+    String name;
+    String superClass;
+    String[] interfaces;
+
+    /**
+     * Constructs a new {@link ClassInfo}.
+     *
+     * @param access the class's access flags.
+     * @param name the internal name of the class.
+     * @param superClass the internal of name of the super class.
+     * @param interfaces the internal names of the class's interfaces
+     */
+    public ClassInfo(
+        final int access,
+        final String name,
+        final String superClass,
+        final String[] interfaces) { // NOPMD(ArrayIsStoredDirectly): non public API.
+      this.access = access;
+      this.name = name;
+      this.superClass = superClass;
+      this.interfaces = interfaces;
+    }
   }
 }

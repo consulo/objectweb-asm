@@ -29,7 +29,6 @@
 package org.objectweb.asm.commons;
 
 import java.util.ArrayList;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.signature.SignatureVisitor;
 
@@ -44,7 +43,7 @@ public class SignatureRemapper extends SignatureVisitor {
 
   private final Remapper remapper;
 
-  private ArrayList<String> classNames = new ArrayList<String>();
+  private ArrayList<String> classNames = new ArrayList<>();
 
   /**
    * Constructs a new {@link SignatureRemapper}. <i>Subclasses must not use this constructor</i>.
@@ -54,7 +53,7 @@ public class SignatureRemapper extends SignatureVisitor {
    * @param remapper the remapper to use to remap the types in the visited signature.
    */
   public SignatureRemapper(final SignatureVisitor signatureVisitor, final Remapper remapper) {
-    this(Opcodes.ASM6, signatureVisitor, remapper);
+    this(Opcodes.ASM7, signatureVisitor, remapper);
   }
 
   /**

@@ -29,7 +29,6 @@ package org.objectweb.asm.tree;
 
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
-
 import org.objectweb.asm.MethodVisitor;
 
 /**
@@ -41,10 +40,10 @@ public class InsnList {
   /** The number of instructions in this list. */
   private int size;
 
-  /** The first instruction in this list. May be <tt>null</tt>. */
+  /** The first instruction in this list. May be {@literal null}. */
   private AbstractInsnNode firstInsn;
 
-  /** The last instruction in this list. May be <tt>null</tt>. */
+  /** The last instruction in this list. May be {@literal null}. */
   private AbstractInsnNode lastInsn;
 
   /**
@@ -65,7 +64,7 @@ public class InsnList {
   /**
    * Returns the first instruction in this list.
    *
-   * @return the first instruction in this list, or <tt>null</tt> if the list is empty.
+   * @return the first instruction in this list, or {@literal null} if the list is empty.
    */
   public AbstractInsnNode getFirst() {
     return firstInsn;
@@ -74,7 +73,7 @@ public class InsnList {
   /**
    * Returns the last instruction in this list.
    *
-   * @return the last instruction in this list, or <tt>null</tt> if the list is empty.
+   * @return the last instruction in this list, or {@literal null} if the list is empty.
    */
   public AbstractInsnNode getLast() {
     return lastInsn;
@@ -101,12 +100,12 @@ public class InsnList {
   }
 
   /**
-   * Returns <tt>true</tt> if the given instruction belongs to this list. This method always scans
+   * Returns {@literal true} if the given instruction belongs to this list. This method always scans
    * the instructions of this list until it finds the given instruction or reaches the end of the
    * list.
    *
    * @param insnNode an instruction.
-   * @return <tt>true</tt> if the given instruction belongs to this list.
+   * @return {@literal true} if the given instruction belongs to this list.
    */
   public boolean contains(final AbstractInsnNode insnNode) {
     AbstractInsnNode currentInsn = firstInsn;
@@ -210,7 +209,7 @@ public class InsnList {
       cache[index] = newInsnNode;
       newInsnNode.index = index;
     } else {
-      newInsnNode.index = 0; // newInnsnNode now belongs to an InsnList.
+      newInsnNode.index = 0; // newInsnNode now belongs to an InsnList.
     }
     oldInsnNode.index = -1; // oldInsnNode no longer belongs to an InsnList.
     oldInsnNode.previousInsn = null;
@@ -496,10 +495,12 @@ public class InsnList {
       }
     }
 
+    @Override
     public boolean hasNext() {
       return nextInsn != null;
     }
 
+    @Override
     public Object next() {
       if (nextInsn == null) {
         throw new NoSuchElementException();
@@ -511,6 +512,7 @@ public class InsnList {
       return result;
     }
 
+    @Override
     public void remove() {
       if (remove != null) {
         if (remove == nextInsn) {
@@ -525,11 +527,16 @@ public class InsnList {
       }
     }
 
+    @Override
     public boolean hasPrevious() {
       return previousInsn != null;
     }
 
+    @Override
     public Object previous() {
+      if (previousInsn == null) {
+        throw new NoSuchElementException();
+      }
       AbstractInsnNode result = previousInsn;
       nextInsn = result;
       previousInsn = result.previousInsn;
@@ -537,6 +544,7 @@ public class InsnList {
       return result;
     }
 
+    @Override
     public int nextIndex() {
       if (nextInsn == null) {
         return size();
@@ -547,6 +555,7 @@ public class InsnList {
       return nextInsn.index;
     }
 
+    @Override
     public int previousIndex() {
       if (previousInsn == null) {
         return -1;
@@ -557,6 +566,7 @@ public class InsnList {
       return previousInsn.index;
     }
 
+    @Override
     public void add(final Object o) {
       if (nextInsn != null) {
         InsnList.this.insertBefore(nextInsn, (AbstractInsnNode) o);
@@ -569,6 +579,7 @@ public class InsnList {
       remove = null;
     }
 
+    @Override
     public void set(final Object o) {
       if (remove != null) {
         InsnList.this.set(remove, (AbstractInsnNode) o);

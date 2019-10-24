@@ -27,43 +27,71 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.util;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.test.AsmTest;
 
 /**
- * CheckAnnotationAdapter tests.
+ * Unit tests for {@link CheckAnnotationAdapter}.
  *
  * @author Eric Bruneton
  */
 public class CheckAnnotationAdapterTest extends AsmTest implements Opcodes {
 
-  private CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
-
   @Test
-  public void testIllegalAnnotationName() {
-    assertThrows(Exception.class, () -> checkAnnotationAdapter.visit(null, new Integer(0)));
+  public void testVisit_illegalAnnotationName() {
+    CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
+
+    Executable visit = () -> checkAnnotationAdapter.visit(null, Integer.valueOf(0));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visit);
+    assertEquals("Annotation value name must not be null", exception.getMessage());
   }
 
   @Test
-  public void testIllegalAnnotationValue() {
-    assertThrows(Exception.class, () -> checkAnnotationAdapter.visit("name", new Object()));
-    assertThrows(
-        Exception.class, () -> checkAnnotationAdapter.visit("name", Type.getMethodType("()V")));
+  public void testVisit_illegalAnnotationValue1() {
+    CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
+
+    Executable visit = () -> checkAnnotationAdapter.visit("name", new Object());
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visit);
+    assertEquals("Invalid annotation value", exception.getMessage());
   }
 
   @Test
-  public void testIllegalAnnotationEnumValue() {
-    assertThrows(
-        Exception.class, () -> checkAnnotationAdapter.visitEnum("name", "Lpkg/Enum;", null));
+  public void testVisit_illegalAnnotationValue2() {
+    CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
+
+    Executable visit = () -> checkAnnotationAdapter.visit("name", Type.getMethodType("()V"));
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visit);
+    assertEquals("Invalid annotation value", exception.getMessage());
   }
 
   @Test
-  public void testIllegalAnnotationValueAfterEnd() {
+  public void testVisit_afterEnd() {
+    CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
     checkAnnotationAdapter.visitEnd();
-    assertThrows(Exception.class, () -> checkAnnotationAdapter.visit("name", new Integer(0)));
+
+    Executable visit = () -> checkAnnotationAdapter.visit("name", Integer.valueOf(0));
+
+    Exception exception = assertThrows(IllegalStateException.class, visit);
+    assertEquals(
+        "Cannot call a visit method after visitEnd has been called", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitEnum_illegalAnnotationEnumValue() {
+    CheckAnnotationAdapter checkAnnotationAdapter = new CheckAnnotationAdapter(null);
+
+    Executable visitEnum = () -> checkAnnotationAdapter.visitEnum("name", "Lpkg/Enum;", null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnum);
+    assertEquals("Invalid enum value", exception.getMessage());
   }
 }

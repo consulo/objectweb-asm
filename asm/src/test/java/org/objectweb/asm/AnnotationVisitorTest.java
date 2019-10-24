@@ -27,24 +27,38 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.objectweb.asm.test.AsmTest;
+import org.objectweb.asm.test.ClassFile;
 
 /**
- * AnnotationVisitor tests.
+ * Unit tests for {@link AnnotationVisitor}.
  *
  * @author Eric Bruneton
  */
 public class AnnotationVisitorTest extends AsmTest {
 
   @Test
-  public void testConstuctor() {
-    assertThrows(IllegalArgumentException.class, () -> new AnnotationVisitor(0) {});
-    assertThrows(IllegalArgumentException.class, () -> new AnnotationVisitor(Integer.MAX_VALUE) {});
+  public void testConstructor_validApi() {
+    Executable constructor = () -> new AnnotationVisitor(Opcodes.ASM4) {};
+
+    assertDoesNotThrow(constructor);
+  }
+
+  @Test
+  public void testConstructor_invalidApi() {
+    Executable constructor = () -> new AnnotationVisitor(0) {};
+
+    Exception exception = assertThrows(IllegalArgumentException.class, constructor);
+    assertEquals("Unsupported api 0", exception.getMessage());
   }
 
   /**
@@ -53,25 +67,32 @@ public class AnnotationVisitorTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource("allClassesAndAllApis")
-  public void testRemoveOrDelete(final PrecompiledClass classParameter, final Api apiParameter) {
+  public void testReadAndWrite_removeOrDeleteAnnotations(
+      final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
-    ClassWriter classWriter1 = new ClassWriter(0);
-    ClassWriter classWriter2 = new ClassWriter(0);
+    ClassWriter removedAnnotationsClassWriter = new ClassWriter(0);
+    ClassWriter deletedAnnotationsClassWriter = new ClassWriter(0);
+    ClassVisitor removeAnnotationsAdapter =
+        new RemoveAnnotationsAdapter(apiParameter.value(), removedAnnotationsClassWriter);
+    ClassVisitor deleteAnnotationsAdapter =
+        new DeleteAnnotationsAdapter(apiParameter.value(), deletedAnnotationsClassWriter);
+
+    Executable removeAnnotations = () -> classReader.accept(removeAnnotationsAdapter, 0);
+    Executable deleteAnnotations = () -> classReader.accept(deleteAnnotationsAdapter, 0);
+
     if (classParameter.isMoreRecentThan(apiParameter)) {
-      assertThrows(
-          RuntimeException.class,
-          () ->
-              classReader.accept(
-                  new RemoveAnnotationsAdapter(apiParameter.value(), classWriter1), 0));
-      assertThrows(
-          RuntimeException.class,
-          () ->
-              classReader.accept(
-                  new DeleteAnnotationsAdapter(apiParameter.value(), classWriter2), 0));
+      Exception removeException =
+          assertThrows(UnsupportedOperationException.class, removeAnnotations);
+      Exception deleteException =
+          assertThrows(UnsupportedOperationException.class, deleteAnnotations);
+      assertTrue(removeException.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+      assertTrue(deleteException.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
     } else {
-      classReader.accept(new RemoveAnnotationsAdapter(apiParameter.value(), classWriter1), 0);
-      classReader.accept(new DeleteAnnotationsAdapter(apiParameter.value(), classWriter2), 0);
-      assertThatClass(classWriter1.toByteArray()).isEqualTo(classWriter2.toByteArray());
+      assertDoesNotThrow(removeAnnotations);
+      assertDoesNotThrow(deleteAnnotations);
+      assertEquals(
+          new ClassFile(removedAnnotationsClassWriter.toByteArray()),
+          new ClassFile(deletedAnnotationsClassWriter.toByteArray()));
     }
   }
 

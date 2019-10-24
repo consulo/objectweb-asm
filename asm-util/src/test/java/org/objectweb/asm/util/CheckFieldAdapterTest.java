@@ -27,44 +27,61 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.test.AsmTest;
 
 /**
- * CheckFieldAdapter tests.
+ * Unit tests for {@link CheckFieldAdapter}.
  *
  * @author Eric Bruneton
  */
 public class CheckFieldAdapterTest extends AsmTest implements Opcodes {
 
-  private CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
-
   @Test
   public void testConstructor() {
+    assertDoesNotThrow(() -> new CheckFieldAdapter(null));
     assertThrows(IllegalStateException.class, () -> new CheckFieldAdapter(null) {});
   }
 
   @Test
-  public void testIllegalFieldMemberVisitAfterEnd() {
-    checkFieldAdapter.visitEnd();
-    assertThrows(Exception.class, () -> checkFieldAdapter.visitAttribute(new Comment()));
-  }
+  public void testVisitTypeAnnotation_illegalTypeAnnotation() {
+    CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
 
-  @Test
-  public void testIllegalTypeAnnotation() {
-    assertThrows(
-        Exception.class,
+    Executable visitTypeAnnotation =
         () ->
             checkFieldAdapter.visitTypeAnnotation(
-                TypeReference.newFormalParameterReference(0).getValue(), null, "LA;", true));
+                TypeReference.newFormalParameterReference(0).getValue(), null, "LA;", true);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitTypeAnnotation);
+    assertEquals("Invalid type reference sort 0x16", exception.getMessage());
   }
 
   @Test
-  public void testIllegalFieldAttribute() {
-    assertThrows(Exception.class, () -> checkFieldAdapter.visitAttribute(null));
+  public void testVisitAttribute_illegalAttribute() {
+    CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
+
+    Executable visitAttribute = () -> checkFieldAdapter.visitAttribute(null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitAttribute);
+    assertEquals("Invalid attribute (must not be null)", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitAttribute_afterEnd() {
+    CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
+    checkFieldAdapter.visitEnd();
+
+    Executable visitAttribute = () -> checkFieldAdapter.visitAttribute(new Comment());
+
+    Exception exception = assertThrows(IllegalStateException.class, visitAttribute);
+    assertEquals(
+        "Cannot call a visit method after visitEnd has been called", exception.getMessage());
   }
 }

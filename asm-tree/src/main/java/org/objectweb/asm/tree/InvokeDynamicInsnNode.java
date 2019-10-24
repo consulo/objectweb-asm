@@ -28,7 +28,6 @@
 package org.objectweb.asm.tree;
 
 import java.util.Map;
-
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -67,7 +66,7 @@ public class InvokeDynamicInsnNode extends AbstractInsnNode {
       final String name,
       final String descriptor,
       final Handle bootstrapMethodHandle,
-      final Object... bootstrapMethodArguments) {
+      final Object... bootstrapMethodArguments) { // NOPMD(ArrayIsStoredDirectly): public field.
     super(Opcodes.INVOKEDYNAMIC);
     this.name = name;
     this.desc = descriptor;

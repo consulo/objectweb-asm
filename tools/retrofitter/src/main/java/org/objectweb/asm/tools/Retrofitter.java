@@ -29,17 +29,15 @@ package org.objectweb.asm.tools;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.zip.GZIPInputStream;
-
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -49,10 +47,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 /**
- * A command line tool to transform classes in order to make them compatible with Java 1.5, and to
- * check that they use only the JDK 1.5 API and JDK 1.5 class file features. The original classes
- * can either be transformed "in place", or be copied first to destination directory and transformed
- * here (leaving the original classes unchanged).
+ * A tool to transform classes in order to make them compatible with Java 1.5, and to check that
+ * they use only the JDK 1.5 API and JDK 1.5 class file features. The original classes can either be
+ * transformed "in place", or be copied first to destination directory and transformed here (leaving
+ * the original classes unchanged).
  *
  * @author Eric Bruneton
  * @author Eugene Kuleshov
@@ -60,28 +58,25 @@ import org.objectweb.asm.Type;
 public class Retrofitter {
 
   /**
-   * The fields and methods of the JDK 1.5 API. Each string has the form "<owner>
-   * <name><descriptor>".
+   * The fields and methods of the JDK 1.5 API. Each string has the form
+   * "&lt;owner&gt;&lt;name&gt;&lt;descriptor&gt;".
    */
-  static final HashSet<String> API = new HashSet<String>();
+  private final HashSet<String> jdkApi = new HashSet<>();
 
   /**
    * The class hierarchy of the JDK 1.5 API. Maps each class name to the name of its super class.
    */
-  static final HashMap<String, String> HIERARCHY = new HashMap<String, String>();
+  private final HashMap<String, String> jdkHierarchy = new HashMap<>();
 
   /**
-   * Transforms the classes from a source directory into a destination directory to make them
-   * compatible with the JDK 1.5, and checks that they only use the JDK 1.5 API.
+   * Constructs a new {@link Retrofitter}.
    *
-   * @param args First argument: source directory. Optional second argument: destination directory.
-   *     If the second argument is provided classes are copied to this destination directory and
-   *     transformed there. Otherwise they are transformed "in place" in the source directory.
-   * @throws IOException if a file can't be read or written.
+   * @throws IOException if the JDK API description file can't be read.
    */
-  public static void main(final String[] args) throws IOException {
+  public Retrofitter() throws IOException {
     InputStream inputStream =
-        new GZIPInputStream(ClassLoader.getSystemResourceAsStream("jdk1.5.0.12.txt.gz"));
+        new GZIPInputStream(
+            Retrofitter.class.getClassLoader().getResourceAsStream("jdk1.5.0.12.txt.gz"));
     BufferedReader reader = new LineNumberReader(new InputStreamReader(inputStream));
     while (true) {
       String line = reader.readLine();
@@ -89,20 +84,25 @@ public class Retrofitter {
         if (line.startsWith("class")) {
           String className = line.substring(6, line.lastIndexOf(' '));
           String superClassName = line.substring(line.lastIndexOf(' ') + 1);
-          HIERARCHY.put(className, superClassName);
+          jdkHierarchy.put(className, superClassName);
         } else {
-          API.add(line);
+          jdkApi.add(line);
         }
       } else {
         break;
       }
     }
+  }
 
-    File src = new File(args[0]);
-    File dst = args.length > 1 ? new File(args[1]) : null;
-    if (!retrofit(src, dst)) {
-      System.exit(1);
-    }
+  /**
+   * Transforms the source class file, or if it is a directory, its files (recursively), in place,
+   * in order to make them compatible with the JDK 1.5.
+   *
+   * @param src source file or directory.
+   * @throws IOException if the source files can't be read or written.
+   */
+  public void retrofit(final File src) throws IOException {
+    retrofit(src, null);
   }
 
   /**
@@ -110,25 +110,22 @@ public class Retrofitter {
    * place or into the destination file or directory, in order to make them compatible with the JDK
    * 1.5.
    *
-   * @param src source file or directory
-   * @param dst optional destination file or directory
-   * @return true if all the source classes use only the JDK 1.5 API.
-   * @throws IOException
+   * @param src source file or directory.
+   * @param dst optional destination file or directory.
+   * @throws IOException if the source or destination file can't be read or written.
    */
-  static boolean retrofit(final File src, final File dst) throws IOException {
+  public void retrofit(final File src, final File dst) throws IOException {
     if (src.isDirectory()) {
-      boolean result = true;
       File[] files = src.listFiles();
       if (files == null) {
         throw new IOException("Unable to read files of " + src);
       }
-      for (int i = 0; i < files.length; ++i) {
-        result &= retrofit(files[i], dst == null ? null : new File(dst, files[i].getName()));
+      for (File file : files) {
+        retrofit(file, dst == null ? null : new File(dst, file.getName()));
       }
-      return result;
     } else if (src.getName().endsWith(".class")) {
       if (dst == null || !dst.exists() || dst.lastModified() < src.lastModified()) {
-        ClassReader classReader = new ClassReader(new FileInputStream(src));
+        ClassReader classReader = new ClassReader(Files.newInputStream(src.toPath()));
         ClassWriter classWriter = new ClassWriter(0);
         ClassVerifier classVerifier = new ClassVerifier(classWriter);
         ClassRetrofitter classRetrofitter = new ClassRetrofitter(classVerifier);
@@ -137,25 +134,19 @@ public class Retrofitter {
         if (dst != null && !dst.getParentFile().exists() && !dst.getParentFile().mkdirs()) {
           throw new IOException("Cannot create directory " + dst.getParentFile());
         }
-        OutputStream os = new FileOutputStream(dst == null ? src : dst);
-        try {
-          os.write(classWriter.toByteArray());
-        } finally {
-          os.close();
+        try (OutputStream outputStream =
+            Files.newOutputStream((dst == null ? src : dst).toPath())) {
+          outputStream.write(classWriter.toByteArray());
         }
-        return classVerifier.ok;
       }
-      return true;
-    } else {
-      return true;
     }
   }
 
-  /** A ClassVisitor that retrofits classes from 1.6 to 1.5 version. */
+  /** A ClassVisitor that retrofits classes to 1.5 version. */
   static class ClassRetrofitter extends ClassVisitor {
 
-    public ClassRetrofitter(ClassVisitor classVisitor) {
-      super(Opcodes.ASM7_EXPERIMENTAL, classVisitor);
+    public ClassRetrofitter(final ClassVisitor classVisitor) {
+      super(Opcodes.ASM7, classVisitor);
     }
 
     @Override
@@ -168,21 +159,48 @@ public class Retrofitter {
         final String[] interfaces) {
       super.visit(Opcodes.V1_5, access, name, signature, superName, interfaces);
     }
+
+    @Override
+    public MethodVisitor visitMethod(
+        final int access,
+        final String name,
+        final String descriptor,
+        final String signature,
+        final String[] exceptions) {
+      return new MethodVisitor(
+          api, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+
+        @Override
+        public void visitMethodInsn(
+            final int opcode,
+            final String owner,
+            final String name,
+            final String descriptor,
+            final boolean isInterface) {
+          // Remove the addSuppressed() method calls generated for try-with-resources statements.
+          // This method is not defined in JDK1.5.
+          if (owner.equals("java/lang/Throwable")
+              && name.equals("addSuppressed")
+              && descriptor.equals("(Ljava/lang/Throwable;)V")) {
+            visitInsn(Opcodes.POP2);
+          } else {
+            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+          }
+        }
+      };
+    }
   }
 
   /**
    * A ClassVisitor checking that a class uses only JDK 1.5 class file features and the JDK 1.5 API.
    */
-  static class ClassVerifier extends ClassVisitor {
+  class ClassVerifier extends ClassVisitor {
 
-    /** The name of the visited class/ */
+    /** The name of the visited class. */
     String className;
 
     /** The name of the currently visited method. */
     String currentMethodName;
-
-    /** Whether the class uses only JDK 1.5 class file features and APIs. */
-    boolean ok;
 
     public ClassVerifier(final ClassVisitor classVisitor) {
       // Make sure use we don't use Java 9 or higher classfile features.
@@ -190,7 +208,6 @@ public class Retrofitter {
       // features (invokedynamic), but this can't be done in the same way.
       // Instead, we use manual checks below.
       super(Opcodes.ASM4, classVisitor);
-      ok = true;
     }
 
     @Override
@@ -202,8 +219,7 @@ public class Retrofitter {
         final String superName,
         final String[] interfaces) {
       if ((version & 0xFFFF) > Opcodes.V1_5) {
-        System.err.println("ERROR: " + name + " version is newer than 1.5");
-        ok = false;
+        throw new IllegalArgumentException("ERROR: " + name + " version is newer than 1.5");
       }
       className = name;
       super.visit(version, access, name, signature, superName, interfaces);
@@ -213,17 +229,18 @@ public class Retrofitter {
     public MethodVisitor visitMethod(
         final int access,
         final String name,
-        final String desc,
+        final String descriptor,
         final String signature,
         final String[] exceptions) {
-      currentMethodName = name + desc;
-      MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
-      return new MethodVisitor(Opcodes.ASM4, mv) {
+      currentMethodName = name + descriptor;
+      MethodVisitor methodVisitor =
+          super.visitMethod(access, name, descriptor, signature, exceptions);
+      return new MethodVisitor(Opcodes.ASM4, methodVisitor) {
         @Override
         public void visitFieldInsn(
-            final int opcode, final String owner, final String name, final String desc) {
+            final int opcode, final String owner, final String name, final String descriptor) {
           check(owner, name);
-          super.visitFieldInsn(opcode, owner, name, desc);
+          super.visitFieldInsn(opcode, owner, name, descriptor);
         }
 
         @Override
@@ -231,48 +248,47 @@ public class Retrofitter {
             final int opcode,
             final String owner,
             final String name,
-            final String desc,
-            final boolean itf) {
-          check(owner, name + desc);
-          super.visitMethodInsn(opcode, owner, name, desc, itf);
+            final String descriptor,
+            final boolean isInterface) {
+          check(owner, name + descriptor);
+          super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
         }
 
         @Override
-        public void visitLdcInsn(Object cst) {
-          if (cst instanceof Type) {
-            int sort = ((Type) cst).getSort();
+        public void visitLdcInsn(final Object value) {
+          if (value instanceof Type) {
+            int sort = ((Type) value).getSort();
             if (sort == Type.METHOD) {
-              System.err.println(
+              throw new IllegalArgumentException(
                   "ERROR: ldc with a MethodType called in "
                       + className
                       + ' '
                       + currentMethodName
                       + " is not available in JDK 1.5");
-              ok = false;
             }
-          } else if (cst instanceof Handle) {
-            System.err.println(
+          } else if (value instanceof Handle) {
+            throw new IllegalArgumentException(
                 "ERROR: ldc with a MethodHandle called in "
                     + className
                     + ' '
                     + currentMethodName
                     + " is not available in JDK 1.5");
-            ok = false;
           }
-          super.visitLdcInsn(cst);
+          super.visitLdcInsn(value);
         }
 
         @Override
         public void visitInvokeDynamicInsn(
-            String name, String desc, Handle bsm, Object... bsmArgs) {
-          System.err.println(
+            final String name,
+            final String descriptor,
+            final Handle bootstrapMethodHandle,
+            final Object... bootstrapMethodArguments) {
+          throw new IllegalArgumentException(
               "ERROR: invokedynamic called in "
                   + className
                   + ' '
                   + currentMethodName
                   + " is not available in JDK 1.5");
-          ok = false;
-          super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
         }
       };
     }
@@ -283,16 +299,16 @@ public class Retrofitter {
      * @param owner A class name.
      * @param member A field name or a method name and descriptor.
      */
-    void check(String owner, String member) {
+    void check(final String owner, final String member) {
       if (owner.startsWith("java/")) {
-        String o = owner;
-        while (o != null) {
-          if (API.contains(o + ' ' + member)) {
+        String currentOwner = owner;
+        while (currentOwner != null) {
+          if (jdkApi.contains(currentOwner + ' ' + member)) {
             return;
           }
-          o = HIERARCHY.get(o);
+          currentOwner = jdkHierarchy.get(currentOwner);
         }
-        System.err.println(
+        throw new IllegalArgumentException(
             "ERROR: "
                 + owner
                 + ' '
@@ -302,7 +318,6 @@ public class Retrofitter {
                 + ' '
                 + currentMethodName
                 + " is not defined in the JDK 1.5 API");
-        ok = false;
       }
     }
   }

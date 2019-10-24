@@ -2,7 +2,6 @@ package org.objectweb.asm.benchmarks;
 
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
-
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -13,7 +12,6 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypePath;
-import org.objectweb.asm.TypeReference;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
@@ -39,8 +37,8 @@ public class TypeBenchmark extends AbstractBenchmark {
   @Setup
   public void prepare() throws Exception {
     prepareClasses();
-    descriptors = new ArrayList<String>();
-    methodDescriptors = new ArrayList<String>();
+    descriptors = new ArrayList<>();
+    methodDescriptors = new ArrayList<>();
     for (byte[] classFile : classFiles) {
       new ClassReader(classFile).accept(new CollectTypesVisitor(), 0);
     }
@@ -55,23 +53,23 @@ public class TypeBenchmark extends AbstractBenchmark {
       blackhole.consume(Type.getType(methodDescriptor));
     }
   }
-  
+
   @Benchmark
   public void getArgumentsAndReturnTypesFromDescriptor(final Blackhole blackhole) {
     for (String methodDescriptor : methodDescriptors) {
-	  Type[] argumentTypes = Type.getArgumentTypes(methodDescriptor);
-	  Type returnType = Type.getReturnType(methodDescriptor);
-	  blackhole.consume(Type.getMethodType(returnType, argumentTypes));
+      Type[] argumentTypes = Type.getArgumentTypes(methodDescriptor);
+      Type returnType = Type.getReturnType(methodDescriptor);
+      blackhole.consume(Type.getMethodType(returnType, argumentTypes));
     }
   }
 
   @Benchmark
   public void getArgumentsAndReturnSizeFromDescriptor(final Blackhole blackhole) {
     for (String methodDescriptor : methodDescriptors) {
-  	  blackhole.consume(Type.getArgumentsAndReturnSizes(methodDescriptor));
+      blackhole.consume(Type.getArgumentsAndReturnSizes(methodDescriptor));
     }
   }
-  
+
   class CollectTypesVisitor extends ClassVisitor {
 
     AnnotationVisitor annotationVisitor =
@@ -90,7 +88,7 @@ public class TypeBenchmark extends AbstractBenchmark {
         };
 
     CollectTypesVisitor() {
-      super(Opcodes.ASM6);
+      super(Opcodes.ASM7);
     }
 
     @Override

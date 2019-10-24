@@ -29,8 +29,8 @@ package org.objectweb.asm.benchmarks;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
-
 import org.gjt.jclasslib.bytecode.ImmediateByteInstruction;
 import org.gjt.jclasslib.bytecode.ImmediateShortInstruction;
 import org.gjt.jclasslib.bytecode.Opcodes;
@@ -41,6 +41,7 @@ import org.gjt.jclasslib.structures.AttributeInfo;
 import org.gjt.jclasslib.structures.CPInfo;
 import org.gjt.jclasslib.structures.ClassFile;
 import org.gjt.jclasslib.structures.ConstantPoolUtil;
+import org.gjt.jclasslib.structures.InvalidByteCodeException;
 import org.gjt.jclasslib.structures.MethodInfo;
 import org.gjt.jclasslib.structures.attributes.CodeAttribute;
 import org.gjt.jclasslib.structures.attributes.SourceFileAttribute;
@@ -130,12 +131,12 @@ public class JClassLibGenerator extends Generator {
       classFile.setMethods(new MethodInfo[] {methodInfo1, methodInfo2});
       classFile.setAttributes(new AttributeInfo[] {sourceFileAttribute});
 
-      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-      DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-      classFile.write(dataOutputStream);
-      dataOutputStream.close();
-      return byteArrayOutputStream.toByteArray();
-    } catch (Exception e) {
+      try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+          DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
+        classFile.write(dataOutputStream);
+        return byteArrayOutputStream.toByteArray();
+      }
+    } catch (IOException | InvalidByteCodeException e) {
       throw new RuntimeException("Class generation failed", e);
     }
   }
