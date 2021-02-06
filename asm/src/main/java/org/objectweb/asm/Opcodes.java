@@ -58,7 +58,7 @@ public interface Opcodes {
    */
   @Deprecated int ASM10_EXPERIMENTAL = 1 << 24 | 10 << 16 | 0 << 8;
 
-  int API_VERSION = ASM7; //[JB: convenience constant]
+  int API_VERSION = ASM9; //[JB: convenience constant]
 
   /*
    * Internal flags used to redirect calls to deprecated methods. For instance, if a visitOldStuff
