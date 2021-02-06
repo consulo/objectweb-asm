@@ -56,7 +56,9 @@ public abstract class MethodVisitor {
    */
   protected final int api;
 
-  /** The method visitor to which this visitor must delegate method calls. May be null. */
+  /**
+   * The method visitor to which this visitor must delegate method calls. May be {@literal null}.
+   */
   protected MethodVisitor mv;
 
   /**
@@ -78,8 +80,17 @@ public abstract class MethodVisitor {
    *     be null.
    */
   public MethodVisitor(final int api, final MethodVisitor methodVisitor) {
-    if (api != Opcodes.ASM7 && api != Opcodes.ASM6 && api != Opcodes.ASM5 && api != Opcodes.ASM4) {
+    if (api != Opcodes.ASM9
+        && api != Opcodes.ASM8
+        && api != Opcodes.ASM7
+        && api != Opcodes.ASM6
+        && api != Opcodes.ASM5
+        && api != Opcodes.ASM4
+        && api != Opcodes.ASM10_EXPERIMENTAL) {
       throw new IllegalArgumentException("Unsupported api " + api);
+    }
+    if (api == Opcodes.ASM10_EXPERIMENTAL) {
+      Constants.checkAsmExperimental(this);
     }
     this.api = api;
     this.mv = methodVisitor;
@@ -92,7 +103,7 @@ public abstract class MethodVisitor {
   /**
    * Visits a parameter of this method.
    *
-   * @param name parameter name or null if none is provided.
+   * @param name parameter name or {@literal null} if none is provided.
    * @param access the parameter's access flags, only {@code ACC_FINAL}, {@code ACC_SYNTHETIC}
    *     or/and {@code ACC_MANDATED} are allowed (see {@link Opcodes}).
    */
@@ -532,7 +543,7 @@ public abstract class MethodVisitor {
             || (value instanceof Type && ((Type) value).getSort() == Type.METHOD))) {
       throw new UnsupportedOperationException(REQUIRES_ASM5);
     }
-    if (api != Opcodes.ASM7 && value instanceof ConstantDynamic) {
+    if (api < Opcodes.ASM7 && value instanceof ConstantDynamic) {
       throw new UnsupportedOperationException("This feature requires ASM7");
     }
     if (mv != null) {

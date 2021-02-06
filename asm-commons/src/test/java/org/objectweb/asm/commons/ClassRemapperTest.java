@@ -39,6 +39,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
@@ -149,7 +150,7 @@ public class ClassRemapperTest extends AsmTest {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(
-            Opcodes.ASM7,
+            /* latest api */ Opcodes.ASM9,
             classNode,
             new Remapper() {
               @Override
@@ -194,7 +195,7 @@ public class ClassRemapperTest extends AsmTest {
     ClassWriter classWriter = new ClassWriter(0);
     UpperCaseRemapper upperCaseRemapper = new UpperCaseRemapper(classParameter.getInternalName());
     ClassRemapper classRemapper =
-        new ClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
+        newClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
 
     Executable accept = () -> classReader.accept(classRemapper, 0);
 
@@ -225,7 +226,7 @@ public class ClassRemapperTest extends AsmTest {
     ClassWriter classWriter = new ClassWriter(0);
     UpperCaseRemapper upperCaseRemapper = new UpperCaseRemapper(classParameter.getInternalName());
     ClassRemapper classRemapper =
-        new ClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
+        newClassRemapper(apiParameter.value(), classWriter, upperCaseRemapper);
 
     Executable accept = () -> classNode.accept(classRemapper);
 
@@ -254,6 +255,11 @@ public class ClassRemapperTest extends AsmTest {
     checkMethodAdapter.version = Opcodes.V1_5;
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitFieldInsn(Opcodes.GETFIELD, internalName, "name", "I");
+  }
+
+  ClassRemapper newClassRemapper(
+      final int api, final ClassVisitor classVisitor, final Remapper remapper) {
+    return new ClassRemapper(api, classVisitor, remapper);
   }
 
   static class UpperCaseRemapper extends Remapper {

@@ -282,6 +282,40 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
+  public void testVisitRecordComponent_illegalRecordComponentSignature1() {
+    CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
+    checkClassAdapter.visit(V14, ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
+    Executable visitRecordComponent = () -> checkClassAdapter.visitRecordComponent("i", "I", "L;");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRecordComponent);
+    assertEquals("L;: identifier expected at index 1", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitRecordComponent_illegalRecordComponentSignature2() {
+    CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
+    checkClassAdapter.visit(V14, ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
+    Executable visitRecordComponent = () -> checkClassAdapter.visitRecordComponent("i", "I", "LC+");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRecordComponent);
+    assertEquals("LC+: ';' expected at index 3", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitRecordComponent_illegalRecordComponentSignature3() {
+    CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
+    checkClassAdapter.visit(V14, ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
+    Executable visitRecordComponent =
+        () -> checkClassAdapter.visitRecordComponent("i", "I", "LC;I");
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitRecordComponent);
+    assertEquals("LC;I: error at index 3", exception.getMessage());
+  }
+
+  @Test
   public void testVisitField_illegalAccessFlagSet() {
     CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
     checkClassAdapter.visit(V1_1, ACC_PUBLIC, "C", null, "java/lang/Object", null);
@@ -404,7 +438,7 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
       final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
-    ClassVisitor classVisitor = new CheckClassAdapter(null);
+    ClassVisitor classVisitor = new CheckClassAdapter(apiParameter.value(), null, true) {};
 
     Executable accept = () -> classReader.accept(classVisitor, attributes(), 0);
 
@@ -417,7 +451,11 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
       final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
-    ClassVisitor classVisitor = new CheckClassAdapter(new ClassVisitor(Opcodes.ASM7, null) {});
+    ClassVisitor classVisitor =
+        new CheckClassAdapter(
+            apiParameter.value(),
+            new ClassVisitor(/* latest */ Opcodes.ASM10_EXPERIMENTAL, null) {},
+            true) {};
 
     Executable accept = () -> classReader.accept(classVisitor, attributes(), 0);
 

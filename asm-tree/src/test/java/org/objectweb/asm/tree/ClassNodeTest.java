@@ -47,6 +47,8 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.ModuleVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.RecordComponentVisitor;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.test.AsmTest;
 import org.objectweb.asm.test.ClassFile;
@@ -82,7 +84,7 @@ public class ClassNodeTest extends AsmTest {
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
   public void testCheck(final PrecompiledClass classParameter, final Api apiParameter) {
-    ClassNode classNode = new ClassNode(apiParameter.value());
+    ClassNode classNode = new ClassNode(apiParameter.value()) {};
     new ClassReader(classParameter.getBytes()).accept(classNode, attributes(), 0);
 
     Executable check = () -> classNode.check(apiParameter.value());
@@ -100,7 +102,7 @@ public class ClassNodeTest extends AsmTest {
   public void testVisitAndAccept(final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
-    ClassNode classNode = new ClassNode(apiParameter.value());
+    ClassNode classNode = new ClassNode(apiParameter.value()) {};
     ClassWriter classWriter = new ClassWriter(0);
 
     classReader.accept(classNode, attributes(), 0);
@@ -119,7 +121,7 @@ public class ClassNodeTest extends AsmTest {
       final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
-    ClassNode classNode = new ClassNode(apiParameter.value());
+    ClassNode classNode = new ClassNode(apiParameter.value()) {};
     ClassWriter classWriter = new ClassWriter(0);
 
     classReader.accept(classNode, attributes(), 0);
@@ -138,7 +140,7 @@ public class ClassNodeTest extends AsmTest {
       final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
-    ClassNode classNode = new ClassNode(apiParameter.value());
+    ClassNode classNode = new ClassNode(apiParameter.value()) {};
     ClassWriter classWriter = new ClassWriter(0);
 
     classReader.accept(classNode, attributes(), 0);
@@ -177,6 +179,31 @@ public class ClassNodeTest extends AsmTest {
     }
 
     @Override
+    public void visit(
+        final int version,
+        final int access,
+        final String name,
+        final String signature,
+        final String superName,
+        final String[] interfaces) {
+      super.visit(version, access & ~Opcodes.ACC_RECORD, name, signature, superName, interfaces);
+    }
+
+    @Override
+    public ModuleVisitor visitModule(final String name, final int access, final String version) {
+      return null;
+    }
+
+    @Override
+    public void visitNestHost(final String nestHost) {}
+
+    @Override
+    public void visitNestMember(final String nestMember) {}
+
+    @Override
+    public void visitPermittedSubclass(final String permittedSubclass) {}
+
+    @Override
     public AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
       return null;
     }
@@ -187,6 +214,15 @@ public class ClassNodeTest extends AsmTest {
         final TypePath typePath,
         final String descriptor,
         final boolean visible) {
+      return null;
+    }
+
+    @Override
+    public void visitAttribute(final Attribute attribute) {}
+
+    @Override
+    public RecordComponentVisitor visitRecordComponent(
+        final String name, final String descriptor, final String signature) {
       return null;
     }
 
@@ -209,19 +245,5 @@ public class ClassNodeTest extends AsmTest {
         final String[] exceptions) {
       return null;
     }
-
-    @Override
-    public ModuleVisitor visitModule(final String name, final int access, final String version) {
-      return null;
-    }
-
-    @Override
-    public void visitNestHost(final String nestHost) {}
-
-    @Override
-    public void visitNestMember(final String nestMember) {}
-
-    @Override
-    public void visitAttribute(final Attribute attribute) {}
   }
 }

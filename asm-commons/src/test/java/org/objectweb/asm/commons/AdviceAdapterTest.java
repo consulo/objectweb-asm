@@ -406,6 +406,44 @@ public class AdviceAdapterTest extends AsmTest {
   }
 
   @Test
+  public void testAllMethods_constructorWithJsrRet() {
+    Label label0 = new Label();
+    Label label1 = new Label();
+    Label label2 = new Label();
+    Label label3 = new Label();
+    MethodNode inputMethod =
+        new MethodNodeBuilder("<init>", "(I)V", 3, 3)
+            .trycatch(label0, label1, label1)
+            .label(label0)
+            .aload(0)
+            .methodInsn(Opcodes.INVOKESPECIAL, "C", "<init>", "()V", false)
+            // After instrumentation, expect a before advice here, before instruction #3.
+            .go(label3)
+            .label(label1)
+            .jsr(label2)
+            // After instrumentation, expect an after advice here, before instruction #6.
+            .athrow()
+            .label(label2)
+            .astore(2)
+            .ret(2)
+            .label(label3)
+            // After instrumentation, expect an after advice here, before instruction #11.
+            .vreturn()
+            .build();
+
+    MethodNode outputMethod = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, null);
+    inputMethod.accept(new BasicAdviceAdapter(outputMethod));
+
+    MethodNode expectedMethod =
+        new ExpectedMethodBuilder(inputMethod)
+            .withBeforeAdviceAt(3)
+            .withAfterAdviceAt(6, 11)
+            .build();
+    assertEquals(toText(expectedMethod), toText(outputMethod));
+    assertDoesNotThrow(() -> buildClassWithMethod(outputMethod).newInstance());
+  }
+
+  @Test
   public void testAllMethods_constructorWithLongsAndArrays() {
     MethodNode inputMethod =
         new MethodNodeBuilder("<init>", "(I)V", 6, 4)
@@ -488,6 +526,112 @@ public class AdviceAdapterTest extends AsmTest {
     assertDoesNotThrow(() -> buildClassWithMethod(outputMethod).newInstance());
   }
 
+  @Test
+  public void testAllMethods_constructorWithForwardGotoAfterBlockWithoutSuccessor() {
+    Label label1 = new Label();
+    Label label2 = new Label();
+    Label label3 = new Label();
+    MethodNode inputMethod =
+        new MethodNodeBuilder("<init>", "(I)V", 3, 2)
+            .trycatch(label1, label2, label2)
+            .aload(0)
+            .methodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+            // After instrumentation, expect a before advice here, before instruction #2.
+            .label(label1)
+            .iconst_0()
+            .go(label3)
+            .label(label2)
+            // After instrumentation, expect an after advice here, before instruction #6.
+            .athrow()
+            .label(label3)
+            .pop()
+            // After instrumentation, expect an after advice here, before instruction #9.
+            .vreturn()
+            .build();
+
+    MethodNode outputMethod = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, null);
+    inputMethod.accept(new BasicAdviceAdapter(outputMethod));
+
+    MethodNode expectedMethod =
+        new ExpectedMethodBuilder(inputMethod)
+            .withBeforeAdviceAt(2)
+            .withAfterAdviceAt(6)
+            .withAfterAdviceAt(9)
+            .build();
+    assertEquals(toText(expectedMethod), toText(outputMethod));
+    assertDoesNotThrow(() -> buildClassWithMethod(outputMethod).newInstance());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"lookupswitch", "tableswitch"})
+  public void testAllMethods_constructorWithForwardSwitchAfterBlockWithoutSuccessor(
+      final String parameter) {
+    Label label1 = new Label();
+    Label label2 = new Label();
+    Label label3 = new Label();
+    MethodNode inputMethod =
+        new MethodNodeBuilder("<init>", "(I)V", 3, 2)
+            .trycatch(label1, label2, label2)
+            .aload(0)
+            .methodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+            // After instrumentation, expect a before advice here, before instruction #2.
+            .label(label1)
+            .iconst_0()
+            .iconst_0()
+            .switchto(label3, label3, /*useTableSwitch=*/ parameter.equals("tableswitch"))
+            .label(label2)
+            // After instrumentation, expect an after advice here, before instruction #7.
+            .athrow()
+            .label(label3)
+            .pop()
+            // After instrumentation, expect an after advice here, before instruction #10.
+            .vreturn()
+            .build();
+
+    MethodNode outputMethod = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, null);
+    inputMethod.accept(new BasicAdviceAdapter(outputMethod));
+
+    MethodNode expectedMethod =
+        new ExpectedMethodBuilder(inputMethod)
+            .withBeforeAdviceAt(2)
+            .withAfterAdviceAt(7)
+            .withAfterAdviceAt(10)
+            .build();
+    assertEquals(toText(expectedMethod), toText(outputMethod));
+    assertDoesNotThrow(() -> buildClassWithMethod(outputMethod).newInstance());
+  }
+
+  @Test
+  public void testAllMethods_constructorWithHandlerFallthroughToPrivateMethodCall() {
+    Label label1 = new Label();
+    Label label2 = new Label();
+    Label label3 = new Label();
+    MethodNode inputMethod =
+        new MethodNodeBuilder("<init>", "(I)V", 2, 2)
+            .trycatch(label1, label2, label2)
+            .aload(0)
+            .methodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+            // After instrumentation, expect a before advice here, before instruction #2.
+            .label(label1)
+            .go(label3)
+            .label(label2)
+            .astore(1)
+            .label(label3)
+            .aload(0)
+            .methodInsn(Opcodes.INVOKESPECIAL, "C", "privateMethod", "()V", false)
+            // After instrumentation, expect an after advice here, before instruction #9.
+            .vreturn()
+            .build();
+
+    MethodNode outputMethod = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, null);
+    inputMethod.accept(new BasicAdviceAdapter(outputMethod));
+
+    MethodNode expectedMethod =
+        new ExpectedMethodBuilder(inputMethod).withBeforeAdviceAt(2).withAfterAdviceAt(9).build();
+    assertEquals(toText(expectedMethod), toText(outputMethod));
+    assertDoesNotThrow(() -> buildClassWithMethod(outputMethod).newInstance());
+  }
+
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
   public void testAllMethods_precompiledClass(
@@ -519,8 +663,8 @@ public class AdviceAdapterTest extends AsmTest {
     MethodNode outputMethod = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, null);
     AdviceAdapter adviceAdapter =
         new AdviceAdapter(
-            Opcodes.ASM7,
-            new MethodVisitor(Opcodes.ASM7, outputMethod) {},
+            /* latest */ Opcodes.ASM10_EXPERIMENTAL,
+            new MethodVisitor(/* latest */ Opcodes.ASM10_EXPERIMENTAL, outputMethod) {},
             Opcodes.ACC_PUBLIC,
             "<init>",
             "()V") {
@@ -578,7 +722,12 @@ public class AdviceAdapterTest extends AsmTest {
   private static class BasicAdviceAdapter extends AdviceAdapter {
 
     BasicAdviceAdapter(final MethodVisitor methodVisitor) {
-      super(Opcodes.ASM7, methodVisitor, Opcodes.ACC_PUBLIC, "<init>", "(I)V");
+      super(
+          /* latest */ Opcodes.ASM10_EXPERIMENTAL,
+          methodVisitor,
+          Opcodes.ACC_PUBLIC,
+          "<init>",
+          "(I)V");
     }
 
     @Override

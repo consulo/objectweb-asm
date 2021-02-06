@@ -288,7 +288,7 @@ public class ClassFile {
     builder.add("magic: ", parser.u4());
     builder.add("minor_version: ", parser.u2());
     int majorVersion = parser.u2();
-    if (majorVersion > /* V12 = */ 56) {
+    if (majorVersion > /* V15 = */ 59) {
       throw new ClassFormatException("Unsupported class version");
     }
     builder.add("major_version: ", majorVersion);
@@ -494,6 +494,10 @@ public class ClassFile {
       dumpNestHostAttribute(parser, builder);
     } else if (attributeName.equals("NestMembers")) {
       dumpNestMembersAttribute(parser, builder);
+    } else if (attributeName.equals("PermittedSubclasses")) {
+      dumpPermittedSubclassesAttribute(parser, builder);
+    } else if (attributeName.equals("Record")) {
+      dumpRecordAttribute(parser, builder);
     } else if (attributeName.equals("StackMap")) {
       dumpStackMapAttribute(parser, builder);
     } else if (!attributeName.equals("CodeComment") && !attributeName.equals("Comment")) {
@@ -1687,6 +1691,40 @@ public class ClassFile {
   }
 
   /**
+   * Parses and dumps a PermittedSubclasses attribute.
+   *
+   * @param parser a class parser.
+   * @param builder a dump builder.
+   * @throws IOException if the class can't be parsed.
+   * @see <a href="https://openjdk.java.net/jeps/360">JEP 360</a>
+   */
+  private static void dumpPermittedSubclassesAttribute(final Parser parser, final Builder builder)
+      throws IOException {
+    int permittedSubclassesCount = builder.add("permitted_subclasses_count: ", parser.u2());
+    for (int i = 0; i < permittedSubclassesCount; ++i) {
+      builder.addCpInfo("class: ", parser.u2());
+    }
+  }
+
+  /**
+   * Parses and dumps a Record attribute.
+   *
+   * @param parser a class parser.
+   * @param builder a dump builder.
+   * @throws IOException if the class can't be parsed.
+   * @see <a href="https://openjdk.java.net/jeps/360">JEP 360</a>
+   */
+  private static void dumpRecordAttribute(final Parser parser, final Builder builder)
+      throws IOException {
+    int numberOfComponentRecords = builder.add("number_of_component_records: ", parser.u2());
+    for (int i = 0; i < numberOfComponentRecords; ++i) {
+      builder.addCpInfo("record_component_name: ", parser.u2());
+      builder.addCpInfo("record_component_descriptor: ", parser.u2());
+      dumpAttributeList(parser, builder);
+    }
+  }
+
+  /**
    * Parses and dumps a StackMap attribute.
    *
    * @param parser a class parser.
@@ -1747,6 +1785,8 @@ public class ClassFile {
     }
 
     /**
+     * Returns the constant pool item with the given index.
+     *
      * @param <C> a CpInfo subclass.
      * @param cpIndex a constant pool entry index.
      * @param cpInfoType the expected type of the constant pool entry.
@@ -2335,7 +2375,7 @@ public class ClassFile {
   private abstract static class AbstractBuilder<T> implements ClassContext, MethodContext {
     /** Flag used to distinguish CpInfo keys in {@link #context}. */
     private static final int CP_INFO_KEY = 0xF0000000;
-    /** The parent node of this node. May be null. */
+    /** The parent node of this node. May be {@literal null}. */
     private final AbstractBuilder<?> parent;
     /** The children of this builder. */
     final ArrayList<T> children;

@@ -44,6 +44,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -225,11 +227,14 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
   public void testStreamConstructor(final PrecompiledClass classParameter, final Api apiParameter)
       throws IOException {
-    InputStream inputStream =
+    ClassReader classReader;
+    try (InputStream inputStream =
         ClassLoader.getSystemResourceAsStream(
-            classParameter.getName().replace('.', '/') + ".class");
-
-    ClassReader classReader = new ClassReader(inputStream);
+            classParameter.getName().replace('.', '/') + ".class")) {
+      classReader = new ClassReader(inputStream);
+    } catch (IOException ioe) {
+      throw ioe;
+    }
 
     assertNotEquals(0, classReader.getAccess());
     assertEquals(classParameter.getInternalName(), classReader.getClassName());
@@ -252,7 +257,7 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
   /** Tests {@link ClassReader#ClassReader(java.io.InputStream)} with an empty stream. */
   @Test
   public void testStreamConstructor_emptyStream() throws IOException {
-    InputStream inputStream =
+    try (InputStream inputStream =
         new InputStream() {
 
           @Override
@@ -264,13 +269,15 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
           public int read() throws IOException {
             return -1;
           }
-        };
+        }) {
+      Executable streamConstructor = () -> new ClassReader(inputStream);
 
-    Executable streamConstructor = () -> new ClassReader(inputStream);
-
-    assertTimeoutPreemptively(
-        Duration.ofMillis(100),
-        () -> assertThrows(ArrayIndexOutOfBoundsException.class, streamConstructor));
+      assertTimeoutPreemptively(
+          Duration.ofMillis(100),
+          () -> assertThrows(ArrayIndexOutOfBoundsException.class, streamConstructor));
+    } catch (IOException ioe) {
+      throw ioe;
+    }
   }
 
   /** Tests the ClassReader accept method with an empty visitor. */
@@ -301,7 +308,15 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
     Executable accept = () -> classReader.accept(classVisitor, ClassReader.SKIP_DEBUG);
 
-    if (classParameter.isMoreRecentThan(apiParameter)) {
+    // The following jdk8 classes contain MethodParameters attributes which require ASM5. Here we
+    // skip these attributes with SKIP_DEBUG, and these classes contain no other features requiring
+    // ASM5 or more, so they can be read with ASM4.
+    if (classParameter.isMoreRecentThan(apiParameter)
+        && classParameter != PrecompiledClass.JDK8_ALL_FRAMES
+        && classParameter != PrecompiledClass.JDK8_ALL_STRUCTURES
+        && classParameter != PrecompiledClass.JDK8_ANONYMOUS_INNER_CLASS
+        && classParameter != PrecompiledClass.JDK8_INNER_CLASS
+        && classParameter != PrecompiledClass.JDK8_LARGE_METHOD) {
       Exception exception = assertThrows(UnsupportedOperationException.class, accept);
       assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
     } else {
@@ -369,8 +384,8 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
   }
 
   /**
-   * Tests the ClassReader accept method with a visitor that skips fields, methods, modules and nest
-   * host and members.
+   * Tests the ClassReader accept method with a visitor that skips fields, methods, members,
+   * modules, nest host, permitted subclasses and record.
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
@@ -379,10 +394,26 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassVisitor classVisitor =
         new EmptyClassVisitor(apiParameter.value()) {
+          @Override
+          public void visit(
+              final int version,
+              final int access,
+              final String name,
+              final String signature,
+              final String superName,
+              final String[] interfaces) {
+            // access may contain ACC_RECORD
+          }
 
           @Override
           public ModuleVisitor visitModule(
               final String name, final int access, final String version) {
+            return null;
+          }
+
+          @Override
+          public RecordComponentVisitor visitRecordComponent(
+              final String name, final String descriptor, final String signature) {
             return null;
           }
 
@@ -411,6 +442,9 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
           @Override
           public void visitNestMember(final String nestMember) {}
+
+          @Override
+          public void visitPermittedSubclass(final String permittedSubclass) {}
         };
 
     Executable accept = () -> classReader.accept(classVisitor, 0);
@@ -427,13 +461,15 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
             || invalidClass == InvalidClass.INVALID_CP_INFO_TAG);
     ClassReader classReader = new ClassReader(invalidClass.getBytes());
 
-    Executable accept = () -> classReader.accept(new EmptyClassVisitor(ASM7), 0);
+    Executable accept =
+        () -> classReader.accept(new EmptyClassVisitor(/* latest */ Opcodes.ASM10_EXPERIMENTAL), 0);
 
     if (invalidClass == InvalidClass.INVALID_CONSTANT_POOL_INDEX
         || invalidClass == InvalidClass.INVALID_CONSTANT_POOL_REFERENCE
         || invalidClass == InvalidClass.INVALID_BYTECODE_OFFSET) {
       Exception exception = assertThrows(ArrayIndexOutOfBoundsException.class, accept);
-      assertTrue(Integer.valueOf(exception.getMessage()) > 0);
+      Matcher matcher = Pattern.compile("\\d+").matcher(exception.getMessage());
+      assertTrue(matcher.find() && Integer.valueOf(matcher.group()) > 0);
     } else {
       assertThrows(IllegalArgumentException.class, accept);
     }
@@ -449,12 +485,18 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
     Executable accept = () -> classReader.accept(classVisitor, 0);
 
+    boolean hasPermittedSubclasses = classParameter == PrecompiledClass.JDK15_ALL_STRUCTURES;
+    boolean hasRecord =
+        classParameter == PrecompiledClass.JDK14_ALL_STRUCTURES_RECORD
+            || classParameter == PrecompiledClass.JDK14_ALL_STRUCTURES_EMPTY_RECORD;
     boolean hasNestHostOrMembers =
         classParameter == PrecompiledClass.JDK11_ALL_STRUCTURES
             || classParameter == PrecompiledClass.JDK11_ALL_STRUCTURES_NESTED;
     boolean hasModules = classParameter == PrecompiledClass.JDK9_MODULE;
     boolean hasTypeAnnotations = classParameter == PrecompiledClass.JDK8_ALL_STRUCTURES;
-    if ((hasNestHostOrMembers && apiParameter.value() < ASM7)
+    if ((hasPermittedSubclasses && apiParameter.value() < ASM9)
+        || (hasRecord && apiParameter.value() < ASM8)
+        || (hasNestHostOrMembers && apiParameter.value() < ASM7)
         || (hasModules && apiParameter.value() < ASM6)
         || (hasTypeAnnotations && apiParameter.value() < ASM5)) {
       Exception exception = assertThrows(UnsupportedOperationException.class, accept);
@@ -497,6 +539,28 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
           }
 
           @Override
+          public RecordComponentVisitor visitRecordComponent(
+              final String name, final String descriptor, final String signature) {
+            super.visitRecordComponent(name, descriptor, signature);
+            return new RecordComponentVisitor(api) {
+              @Override
+              public AnnotationVisitor visitAnnotation(
+                  final String descriptor, final boolean visible) {
+                return new AnnotationVisitor(api) {};
+              }
+
+              @Override
+              public AnnotationVisitor visitTypeAnnotation(
+                  final int typeRef,
+                  final TypePath typePath,
+                  final String descriptor,
+                  final boolean visible) {
+                return new AnnotationVisitor(api) {};
+              }
+            };
+          }
+
+          @Override
           public FieldVisitor visitField(
               final int access,
               final String name,
@@ -521,7 +585,9 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
     if (classParameter.isMoreRecentThan(apiParameter)) {
       Exception exception = assertThrows(UnsupportedOperationException.class, accept);
-      assertTrue(exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN));
+      if (!exception.getMessage().matches(UNSUPPORTED_OPERATION_MESSAGE_PATTERN)) {
+        throw new AssertionError("invalid error message");
+      }
     } else {
       assertDoesNotThrow(accept);
     }
@@ -532,7 +598,7 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
     ClassReader classReader = new ClassReader(PrecompiledClass.JDK5_LOCAL_CLASS.getBytes());
     AtomicInteger parameterIndex = new AtomicInteger(-1);
     ClassVisitor readParameterIndexVisitor =
-        new ClassVisitor(Opcodes.ASM7) {
+        new ClassVisitor(/* latest */ Opcodes.ASM10_EXPERIMENTAL) {
           @Override
           public MethodVisitor visitMethod(
               final int access,
@@ -560,10 +626,14 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
   @Test
   public void testAccept_previewClass() {
-    ClassReader classReader = new ClassReader(PrecompiledClass.JDK11_ALL_INSTRUCTIONS.getBytes());
+    byte[] classFile = PrecompiledClass.JDK11_ALL_INSTRUCTIONS.getBytes();
+    // Set the minor version to 65535.
+    classFile[4] = (byte) 0xFF;
+    classFile[5] = (byte) 0xFF;
+    ClassReader classReader = new ClassReader(classFile);
     AtomicInteger classVersion = new AtomicInteger(0);
     ClassVisitor readVersionVisitor =
-        new ClassVisitor(Opcodes.ASM7) {
+        new ClassVisitor(/* latest */ Opcodes.ASM10_EXPERIMENTAL) {
           @Override
           public void visit(
               final int version,
@@ -583,7 +653,7 @@ public class ClassReaderTest extends AsmTest implements Opcodes {
 
   private static class EmptyClassVisitor extends ClassVisitor {
 
-    AnnotationVisitor annotationVisitor =
+    final AnnotationVisitor annotationVisitor =
         new AnnotationVisitor(api) {
 
           @Override

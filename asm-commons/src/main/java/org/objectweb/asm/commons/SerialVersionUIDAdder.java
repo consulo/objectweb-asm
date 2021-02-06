@@ -150,7 +150,7 @@ public class SerialVersionUIDAdder extends ClassVisitor {
    * @throws IllegalStateException If a subclass calls this constructor.
    */
   public SerialVersionUIDAdder(final ClassVisitor classVisitor) {
-    this(Opcodes.ASM7, classVisitor);
+    this(/* latest api = */ Opcodes.ASM9, classVisitor);
     if (getClass() != SerialVersionUIDAdder.class) {
       throw new IllegalStateException();
     }
@@ -160,7 +160,8 @@ public class SerialVersionUIDAdder extends ClassVisitor {
    * Constructs a new {@link SerialVersionUIDAdder}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6}, {@link Opcodes#ASM7}, {@link
+   *     Opcodes#ASM8} or {@link Opcodes#ASM9}.
    * @param classVisitor a {@link ClassVisitor} to which this visitor will delegate calls.
    */
   protected SerialVersionUIDAdder(final int api, final ClassVisitor classVisitor) {
@@ -186,11 +187,10 @@ public class SerialVersionUIDAdder extends ClassVisitor {
     if (computeSvuid) {
       this.name = name;
       this.access = access;
-      this.interfaces = new String[interfaces.length];
+      this.interfaces = interfaces.clone();
       this.svuidFields = new ArrayList<>();
       this.svuidConstructors = new ArrayList<>();
       this.svuidMethods = new ArrayList<>();
-      System.arraycopy(interfaces, 0, this.interfaces, 0, interfaces.length);
     }
 
     super.visit(version, access, name, signature, superName, interfaces);

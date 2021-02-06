@@ -44,6 +44,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.ModuleVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.RecordComponentVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.TypeReference;
@@ -173,7 +174,7 @@ public class CheckClassAdapter extends ClassVisitor {
    * @throws IllegalStateException If a subclass calls this constructor.
    */
   public CheckClassAdapter(final ClassVisitor classVisitor, final boolean checkDataFlow) {
-    this(Opcodes.ASM7, classVisitor, checkDataFlow);
+    this(/* latest api = */ Opcodes.ASM9, classVisitor, checkDataFlow);
     if (getClass() != CheckClassAdapter.class) {
       throw new IllegalStateException();
     }
@@ -183,7 +184,8 @@ public class CheckClassAdapter extends ClassVisitor {
    * Constructs a new {@link CheckClassAdapter}.
    *
    * @param api the ASM API version implemented by this visitor. Must be one of {@link
-   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
+   *     Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6}, {@link Opcodes#ASM7}, {@link
+   *     Opcodes#ASM8} or {@link Opcodes#ASM9}.
    * @param classVisitor the class visitor to which this adapter must delegate calls.
    * @param checkDataFlow {@literal true} to perform basic data flow checks, or {@literal false} to
    *     not perform any data flow check (see {@link CheckMethodAdapter}). This option requires
@@ -224,6 +226,7 @@ public class CheckClassAdapter extends ClassVisitor {
             | Opcodes.ACC_ANNOTATION
             | Opcodes.ACC_ENUM
             | Opcodes.ACC_DEPRECATED
+            | Opcodes.ACC_RECORD
             | Opcodes.ACC_MODULE);
     if (name == null) {
       throw new IllegalArgumentException("Illegal class name (null)");
@@ -320,6 +323,13 @@ public class CheckClassAdapter extends ClassVisitor {
   }
 
   @Override
+  public void visitPermittedSubclass(final String permittedSubclass) {
+    checkState();
+    CheckMethodAdapter.checkInternalName(version, permittedSubclass, "permittedSubclass");
+    super.visitPermittedSubclass(permittedSubclass);
+  }
+
+  @Override
   public void visitOuterClass(final String owner, final String name, final String descriptor) {
     checkState();
     if (visitOuterClassCalled) {
@@ -368,6 +378,19 @@ public class CheckClassAdapter extends ClassVisitor {
   }
 
   @Override
+  public RecordComponentVisitor visitRecordComponent(
+      final String name, final String descriptor, final String signature) {
+    checkState();
+    CheckMethodAdapter.checkUnqualifiedName(version, name, "record component name");
+    CheckMethodAdapter.checkDescriptor(version, descriptor, /* canBeVoid = */ false);
+    if (signature != null) {
+      checkFieldSignature(signature);
+    }
+    return new CheckRecordComponentAdapter(
+        api, super.visitRecordComponent(name, descriptor, signature));
+  }
+
+  @Override
   public FieldVisitor visitField(
       final int access,
       final String name,
@@ -386,6 +409,7 @@ public class CheckClassAdapter extends ClassVisitor {
             | Opcodes.ACC_TRANSIENT
             | Opcodes.ACC_SYNTHETIC
             | Opcodes.ACC_ENUM
+            | Opcodes.ACC_MANDATED
             | Opcodes.ACC_DEPRECATED);
     CheckMethodAdapter.checkUnqualifiedName(version, name, "field name");
     CheckMethodAdapter.checkDescriptor(version, descriptor, /* canBeVoid = */ false);
@@ -420,6 +444,7 @@ public class CheckClassAdapter extends ClassVisitor {
             | Opcodes.ACC_ABSTRACT
             | Opcodes.ACC_STRICT
             | Opcodes.ACC_SYNTHETIC
+            | Opcodes.ACC_MANDATED
             | Opcodes.ACC_DEPRECATED);
     if (!"<init>".equals(name) && !"<clinit>".equals(name)) {
       CheckMethodAdapter.checkMethodIdentifier(version, name, "method name");
@@ -971,9 +996,12 @@ public class CheckClassAdapter extends ClassVisitor {
 
     ClassReader classReader;
     if (args[0].endsWith(".class")) {
-      InputStream inputStream =
-          new FileInputStream(args[0]); // NOPMD(AvoidFileStream): can't fix for 1.5 compatibility
-      classReader = new ClassReader(inputStream);
+      // Can't fix PMD warning for 1.5 compatibility.
+      try (InputStream inputStream = new FileInputStream(args[0])) { // NOPMD(AvoidFileStream)
+        classReader = new ClassReader(inputStream);
+      } catch (IOException ioe) {
+        throw ioe;
+      }
     } else {
       classReader = new ClassReader(args[0]);
     }
@@ -1009,7 +1037,8 @@ public class CheckClassAdapter extends ClassVisitor {
       final PrintWriter printWriter) {
     ClassNode classNode = new ClassNode();
     classReader.accept(
-        new CheckClassAdapter(Opcodes.ASM7, classNode, false) {}, ClassReader.SKIP_DEBUG);
+        new CheckClassAdapter(/*latest*/ Opcodes.ASM10_EXPERIMENTAL, classNode, false) {},
+        ClassReader.SKIP_DEBUG);
 
     Type syperType = classNode.superName == null ? null : Type.getObjectType(classNode.superName);
     List<MethodNode> methods = classNode.methods;

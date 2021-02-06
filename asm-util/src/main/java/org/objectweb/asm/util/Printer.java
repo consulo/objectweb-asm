@@ -41,6 +41,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.TypePath;
+import org.objectweb.asm.TypeReference;
 
 /**
  * An abstract converter from visit events to text.
@@ -291,7 +292,8 @@ public abstract class Printer {
 
   /**
    * The ASM API version implemented by this class. The value of this field must be one of {@link
-   * Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6} or {@link Opcodes#ASM7}.
+   * Opcodes#ASM4}, {@link Opcodes#ASM5}, {@link Opcodes#ASM6}, {@link Opcodes#ASM7}, {@link
+   * Opcodes#ASM8} or {@link Opcodes#ASM9}.
    */
   protected final int api;
 
@@ -453,6 +455,16 @@ public abstract class Printer {
   }
 
   /**
+   * Visits a permitted subclasses. A permitted subclass is one of the allowed subclasses of the
+   * current class. See {@link org.objectweb.asm.ClassVisitor#visitPermittedSubclass(String)}.
+   *
+   * @param permittedSubclass the internal name of a permitted subclass.
+   */
+  public void visitPermittedSubclass(final String permittedSubclass) {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
+
+  /**
    * Class inner name. See {@link org.objectweb.asm.ClassVisitor#visitInnerClass}.
    *
    * @param name the internal name of an inner class (see {@link
@@ -465,6 +477,22 @@ public abstract class Printer {
    *     class.
    */
   public abstract void visitInnerClass(String name, String outerName, String innerName, int access);
+
+  /**
+   * Visits a record component of the class. See {@link
+   * org.objectweb.asm.ClassVisitor#visitRecordComponent(String, String, String)}.
+   *
+   * @param name the field's name.
+   * @param descriptor the record component descriptor (see {@link Type}).
+   * @param signature the record component signature. May be {@literal null} if the record component
+   *     type does not use generic types.
+   * @return a visitor to visit this record component annotations and attributes, or {@literal null}
+   *     if this class visitor is not interested in visiting these annotations and attributes.
+   */
+  public Printer visitRecordComponent(
+      final String name, final String descriptor, final String signature) {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
 
   /**
    * Class field. See {@link org.objectweb.asm.ClassVisitor#visitField}.
@@ -638,6 +666,63 @@ public abstract class Printer {
   public abstract void visitAnnotationEnd();
 
   // -----------------------------------------------------------------------------------------------
+  // Record components
+  // -----------------------------------------------------------------------------------------------
+
+  /**
+   * Visits an annotation of the record component. See {@link
+   * org.objectweb.asm.RecordComponentVisitor#visitAnnotation}.
+   *
+   * @param descriptor the class descriptor of the annotation class.
+   * @param visible {@literal true} if the annotation is visible at runtime.
+   * @return a visitor to visit the annotation values, or {@literal null} if this visitor is not
+   *     interested in visiting this annotation.
+   */
+  public Printer visitRecordComponentAnnotation(final String descriptor, final boolean visible) {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
+
+  /**
+   * Visits an annotation on a type in the record component signature. See {@link
+   * org.objectweb.asm.RecordComponentVisitor#visitTypeAnnotation}.
+   *
+   * @param typeRef a reference to the annotated type. The sort of this type reference must be
+   *     {@link TypeReference#CLASS_TYPE_PARAMETER}, {@link
+   *     TypeReference#CLASS_TYPE_PARAMETER_BOUND} or {@link TypeReference#CLASS_EXTENDS}. See
+   *     {@link TypeReference}.
+   * @param typePath the path to the annotated type argument, wildcard bound, array element type, or
+   *     static inner type within 'typeRef'. May be {@literal null} if the annotation targets
+   *     'typeRef' as a whole.
+   * @param descriptor the class descriptor of the annotation class.
+   * @param visible {@literal true} if the annotation is visible at runtime.
+   * @return a visitor to visit the annotation values, or {@literal null} if this visitor is not
+   *     interested in visiting this annotation.
+   */
+  public Printer visitRecordComponentTypeAnnotation(
+      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
+
+  /**
+   * Visits a non standard attribute of the record component. See {@link
+   * org.objectweb.asm.RecordComponentVisitor#visitAttribute}.
+   *
+   * @param attribute an attribute.
+   */
+  public void visitRecordComponentAttribute(final Attribute attribute) {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
+
+  /**
+   * Visits the end of the record component. See {@link
+   * org.objectweb.asm.RecordComponentVisitor#visitEnd}. This method, which is the last one to be
+   * called, is used to inform the visitor that everything have been visited.
+   */
+  public void visitRecordComponentEnd() {
+    throw new UnsupportedOperationException(UNSUPPORTED_OPERATION);
+  }
+
+  // -----------------------------------------------------------------------------------------------
   // Fields
   // -----------------------------------------------------------------------------------------------
 
@@ -684,7 +769,7 @@ public abstract class Printer {
   /**
    * Method parameter. See {@link org.objectweb.asm.MethodVisitor#visitParameter(String, int)}.
    *
-   * @param name parameter name or null if none is provided.
+   * @param name parameter name or {@literal null} if none is provided.
    * @param access the parameter's access flags, only {@code ACC_FINAL}, {@code ACC_SYNTHETIC}
    *     or/and {@code ACC_MANDATED} are allowed (see {@link Opcodes}).
    */
@@ -1220,9 +1305,12 @@ public abstract class Printer {
     if (className.endsWith(".class")
         || className.indexOf('\\') != -1
         || className.indexOf('/') != -1) {
-      InputStream inputStream =
-          new FileInputStream(className); // NOPMD(AvoidFileStream): can't fix for 1.5 compatibility
-      new ClassReader(inputStream).accept(traceClassVisitor, parsingOptions);
+      // Can't fix PMD warning for 1.5 compatibility.
+      try (InputStream inputStream = new FileInputStream(className)) { // NOPMD(AvoidFileStream)
+        new ClassReader(inputStream).accept(traceClassVisitor, parsingOptions);
+      } catch (IOException ioe) {
+        throw ioe;
+      }
     } else {
       new ClassReader(className).accept(traceClassVisitor, parsingOptions);
     }

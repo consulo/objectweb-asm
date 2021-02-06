@@ -110,8 +110,7 @@ public abstract class Remapper {
       String remappedInternalName = mapType(internalName);
       if (remappedInternalName != null) {
         if (remappedInternalNames == null) {
-          remappedInternalNames = new String[internalNames.length];
-          System.arraycopy(internalNames, 0, remappedInternalNames, 0, internalNames.length);
+          remappedInternalNames = internalNames.clone();
         }
         remappedInternalNames[i] = remappedInternalName;
       }
@@ -284,6 +283,20 @@ public abstract class Remapper {
    * @return the new name of the method.
    */
   public String mapInvokeDynamicMethodName(final String name, final String descriptor) {
+    return name;
+  }
+
+  /**
+   * Maps a record component name to its new name. The default implementation of this method returns
+   * the given name, unchanged. Subclasses can override.
+   *
+   * @param owner the internal name of the owner class of the field.
+   * @param name the name of the field.
+   * @param descriptor the descriptor of the field.
+   * @return the new name of the field.
+   */
+  public String mapRecordComponentName(
+      final String owner, final String name, final String descriptor) {
     return name;
   }
 

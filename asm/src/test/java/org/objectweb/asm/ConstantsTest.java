@@ -27,14 +27,23 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Unit tests for {@link Constants}.
@@ -137,8 +146,7 @@ public class ConstantsTest {
     List<Field> verificationTypeInfoTags = getConstants(ConstantType.VERIFICATION_TYPE_INFO_TAG);
 
     Set<Integer> verificationTypeInfoTagValues =
-        verificationTypeInfoTags
-            .stream()
+        verificationTypeInfoTags.stream()
             .map(ConstantsTest::getIntegerValue)
             .collect(Collectors.toSet());
 
@@ -162,9 +170,68 @@ public class ConstantsTest {
     }
   }
 
+  @Test
+  public void testIsWhitelisted() {
+    assertFalse(Constants.isWhitelisted("org/jacoco/core/internal/flow/ClassProbesVisitor"));
+    assertFalse(Constants.isWhitelisted("org/objectweb/asm/ClassWriter"));
+    assertFalse(Constants.isWhitelisted("org/objectweb/asm/util/CheckClassVisitor"));
+    assertFalse(Constants.isWhitelisted("org/objectweb/asm/ClassWriterTest"));
+    assertTrue(Constants.isWhitelisted("org/objectweb/asm/ClassWriterTest$DeadCodeInserter"));
+    assertTrue(Constants.isWhitelisted("org/objectweb/asm/util/TraceClassVisitor"));
+    assertTrue(Constants.isWhitelisted("org/objectweb/asm/util/CheckClassAdapter"));
+  }
+
+  @Test
+  public void testCheckIsPreview_nullStream() {
+    Executable checkIsPreview = () -> Constants.checkIsPreview(null);
+
+    assertThrows(IllegalStateException.class, checkIsPreview);
+  }
+
+  @Test
+  public void testCheckIsPreview_invalidStream() {
+    InputStream invalidStream = new ByteArrayInputStream(new byte[4]);
+
+    Executable checkIsPreview = () -> Constants.checkIsPreview(invalidStream);
+
+    assertThrows(IllegalStateException.class, checkIsPreview);
+  }
+
+  @Test
+  public void testCheckIsPreview_nonPreviewClass() {
+    InputStream nonPreviewStream = new ByteArrayInputStream(new byte[8]);
+
+    Executable checkIsPreview = () -> Constants.checkIsPreview(nonPreviewStream);
+
+    assertThrows(IllegalStateException.class, checkIsPreview);
+  }
+
+  @Test
+  public void testCheckIsPreview_previewClass() {
+    byte[] previewClass = new byte[] {0, 0, 0, 0, (byte) 0xFF, (byte) 0xFF};
+    InputStream previewStream = new ByteArrayInputStream(previewClass);
+
+    Executable checkIsPreview = () -> Constants.checkIsPreview(previewStream);
+
+    assertDoesNotThrow(checkIsPreview);
+  }
+
+  //[JB: ensures `Opcodes#API_VERSION` constant points to the latest non-experimental API version]
+  @Test
+  public void testVersionConstantIsActual() throws ReflectiveOperationException {
+    List<Field> constants = getConstants(ConstantType.ASM_VERSION);
+    int maxVersion = constants.stream()
+            .filter(f -> !f.getName().endsWith("_EXPERIMENTAL"))
+            .mapToInt(f -> Integer.parseInt(f.getName().substring(3)))
+            .max().orElseThrow(() -> new IllegalStateException("No recognizable version constants: " + constants));
+    int versionValue = (int)Opcodes.class.getField("ASM" + maxVersion).get(null);
+    assertEquals(versionValue, Opcodes.API_VERSION);
+  }
+
   private static List<Field> getConstants(final ConstantType constantType) {
-    return Arrays.asList(Constants.class.getFields())
-        .stream()
+    return Stream.concat(
+            Arrays.asList(Opcodes.class.getFields()).stream(),
+            Arrays.asList(Constants.class.getFields()).stream())
         .filter(field -> getType(field).equals(constantType))
         .collect(Collectors.toList());
   }
@@ -175,6 +242,9 @@ public class ConstantsTest {
       case "ASM5":
       case "ASM6":
       case "ASM7":
+      case "ASM8":
+      case "ASM9":
+      case "ASM10_EXPERIMENTAL":
         return ConstantType.ASM_VERSION;
       case "V_PREVIEW":
       case "V1_1":
@@ -190,6 +260,9 @@ public class ConstantsTest {
       case "V11":
       case "V12":
       case "V13":
+      case "V14":
+      case "V15":
+      case "V16":
         return ConstantType.CLASS_VERSION;
       case "ACC_PUBLIC":
       case "ACC_PRIVATE":
@@ -214,7 +287,9 @@ public class ConstantsTest {
       case "ACC_ENUM":
       case "ACC_MANDATED":
       case "ACC_MODULE":
+      case "ACC_SEALED":
         return ConstantType.ACCESS_FLAG;
+      case "ACC_RECORD":
       case "ACC_DEPRECATED":
       case "ACC_CONSTRUCTOR":
         return ConstantType.ASM_ACCESS_FLAG;
