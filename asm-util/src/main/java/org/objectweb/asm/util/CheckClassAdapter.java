@@ -430,7 +430,8 @@ public class CheckClassAdapter extends ClassVisitor {
       final String signature,
       final String[] exceptions) {
     checkState();
-    checkAccess(
+    checkMethodAccess(
+        version,
         access,
         Opcodes.ACC_PUBLIC
             | Opcodes.ACC_PRIVATE
@@ -552,6 +553,23 @@ public class CheckClassAdapter extends ClassVisitor {
     }
     if (Integer.bitCount(access & (Opcodes.ACC_FINAL | Opcodes.ACC_ABSTRACT)) > 1) {
       throw new IllegalArgumentException("final and abstract are mutually exclusive: " + access);
+    }
+  }
+
+  /**
+   * Checks that the given access flags do not contain invalid flags for a method. This method also
+   * checks that mutually incompatible flags are not set simultaneously.
+   *
+   * @param version the class version.
+   * @param access the method access flags to be checked.
+   * @param possibleAccess the valid access flags.
+   */
+  private static void checkMethodAccess(
+      final int version, final int access, final int possibleAccess) {
+    checkAccess(access, possibleAccess);
+    if ((version & 0xFFFF) < Opcodes.V17
+        && Integer.bitCount(access & (Opcodes.ACC_STRICT | Opcodes.ACC_ABSTRACT)) > 1) {
+      throw new IllegalArgumentException("strictfp and abstract are mutually exclusive: " + access);
     }
   }
 
@@ -943,9 +961,9 @@ public class CheckClassAdapter extends ClassVisitor {
         mask = 0xFF0000FF;
         break;
       default:
-        throw new AssertionError();
+        break;
     }
-    if ((typeRef & ~mask) != 0) {
+    if (mask == 0 || (typeRef & ~mask) != 0) {
       throw new IllegalArgumentException(
           "Invalid type reference 0x" + Integer.toHexString(typeRef));
     }
@@ -999,8 +1017,6 @@ public class CheckClassAdapter extends ClassVisitor {
       // Can't fix PMD warning for 1.5 compatibility.
       try (InputStream inputStream = new FileInputStream(args[0])) { // NOPMD(AvoidFileStream)
         classReader = new ClassReader(inputStream);
-      } catch (IOException ioe) {
-        throw ioe;
       }
     } else {
       classReader = new ClassReader(args[0]);
@@ -1116,7 +1132,11 @@ public class CheckClassAdapter extends ClassVisitor {
       if (name.charAt(endIndex - 1) == ';') {
         endIndex--;
       }
-      return name.substring(lastSlashIndex + 1, endIndex);
+      int lastBracketIndex = name.lastIndexOf('[');
+      if (lastBracketIndex == -1) {
+        return name.substring(lastSlashIndex + 1, endIndex);
+      }
+      return name.substring(0, lastBracketIndex + 1) + name.substring(lastSlashIndex + 1, endIndex);
     }
   }
 }

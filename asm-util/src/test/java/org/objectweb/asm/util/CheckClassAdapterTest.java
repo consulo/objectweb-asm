@@ -361,6 +361,30 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
+  public void testVisitMethod_illegalAccessFlagSet() {
+    CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
+    checkClassAdapter.visit(V1_1, ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
+    Executable visitMethod =
+        () -> checkClassAdapter.visitMethod(ACC_ABSTRACT | ACC_STRICT, "m", "()V", null, null);
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitMethod);
+    assertEquals("strictfp and abstract are mutually exclusive: 3072", exception.getMessage());
+  }
+
+  @Test
+  public void testVisitMethod_legalAccessFlagSet_V17() {
+    // Java 17 allows to mix ACC_ABSTRACT and ACC_STRICT because ACC_STRICT is ignored
+    CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
+    checkClassAdapter.visit(V17, ACC_PUBLIC, "C", null, "java/lang/Object", null);
+
+    Executable visitMethod =
+        () -> checkClassAdapter.visitMethod(ACC_ABSTRACT | ACC_STRICT, "m", "()V", null, null);
+
+    assertDoesNotThrow(visitMethod);
+  }
+
+  @Test
   public void testVisitMethod_illegalSignature() {
     CheckClassAdapter checkClassAdapter = new CheckClassAdapter(null);
     checkClassAdapter.visit(V1_1, ACC_PUBLIC, "C", null, "java/lang/Object", null);
@@ -549,6 +573,7 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
     String log = logger.toString();
     assertFalse(log.startsWith(AnalyzerException.class.getName() + ": Error at instruction"));
     assertTrue(log.contains("00000 CheckClassAdapterTest  :  :     ALOAD 0"));
+    assertTrue(log.contains("00001 CheckClassAdapterTest [Object  : [Object  :     ARETURN"));
   }
 
   @Test
@@ -577,5 +602,9 @@ public class CheckClassAdapterTest extends AsmTest implements Opcodes {
 
   private static Attribute[] attributes() {
     return new Attribute[] {new Comment(), new CodeComment()};
+  }
+
+  Object methodWithObjectArrayArgument(final Object[] arg) {
+    return arg;
   }
 }

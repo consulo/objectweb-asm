@@ -25,26 +25,6 @@
 // CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 // THE POSSIBILITY OF SUCH DAMAGE.
-package org.objectweb.asm.tree;
+package invalid;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.test.AsmTest;
-
-/**
- * Unit tests for {@link InsnNode}.
- *
- * @author Eric Bruneton
- */
-public class InsnNodeTest extends AsmTest {
-
-  @Test
-  public void testConstructor() {
-    InsnNode insnNode = new InsnNode(Opcodes.ACONST_NULL);
-
-    assertEquals(AbstractInsnNode.INSN, insnNode.getType());
-    assertEquals(Opcodes.ACONST_NULL, insnNode.getOpcode());
-  }
-}
+public class InvalidSourceDebugExtension {}

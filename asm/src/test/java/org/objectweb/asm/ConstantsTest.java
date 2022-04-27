@@ -230,8 +230,7 @@ public class ConstantsTest {
 
   private static List<Field> getConstants(final ConstantType constantType) {
     return Stream.concat(
-            Arrays.asList(Opcodes.class.getFields()).stream(),
-            Arrays.asList(Constants.class.getFields()).stream())
+            Arrays.stream(Opcodes.class.getFields()), Arrays.stream(Constants.class.getFields()))
         .filter(field -> getType(field).equals(constantType))
         .collect(Collectors.toList());
   }
@@ -263,6 +262,8 @@ public class ConstantsTest {
       case "V14":
       case "V15":
       case "V16":
+      case "V17":
+      case "V18":
         return ConstantType.CLASS_VERSION;
       case "ACC_PUBLIC":
       case "ACC_PRIVATE":
