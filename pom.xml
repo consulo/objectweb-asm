@@ -6,7 +6,7 @@
 
 	<groupId>consulo.internal.org.objectweb.asm</groupId>
 	<artifactId>asm-parent</artifactId>
-	<version>9.2-SNAPSHOT</version>
+	<version>9.6.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<build>
@@ -14,20 +14,18 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.3</version>
+				<version>3.12.1</version>
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
+					<release>11</release>
 					<showDeprecation>true</showDeprecation>
 					<showWarnings>true</showWarnings>
-					<fork>true</fork>
 					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>2.4</version>
+				<version>3.3.0</version>
 				<executions>
 					<execution>
 						<id>attach-sources</id>

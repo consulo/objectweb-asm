@@ -27,26 +27,8 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 package org.objectweb.asm.util;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
 import org.codehaus.commons.compiler.CompileException;
-import org.codehaus.janino.ClassLoaderIClassLoader;
-import org.codehaus.janino.IClassLoader;
-import org.codehaus.janino.Parser;
-import org.codehaus.janino.Scanner;
-import org.codehaus.janino.UnitCompiler;
+import org.codehaus.janino.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,6 +37,18 @@ import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.test.AsmTest;
 import org.objectweb.asm.test.ClassFile;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Unit tests for {@link ASMifier}.
@@ -112,8 +106,8 @@ class ASMifierTest extends AsmTest {
     ArrayList<org.codehaus.janino.util.ClassFile> generatedClassFiles = new ArrayList<>();
     try {
       UnitCompiler unitCompiler =
-          new UnitCompiler(parser.parseAbstractCompilationUnit(), ICLASS_LOADER);
-      unitCompiler.compileUnit(true, true, true, generatedClassFiles);
+          new UnitCompiler(parser.parseCompilationUnit(), ICLASS_LOADER);
+      generatedClassFiles.addAll(List.of(unitCompiler.compileUnit(true, true, true)));
       return generatedClassFiles.get(0).toByteArray();
     } catch (CompileException e) {
       throw new AssertionError(source, e);
