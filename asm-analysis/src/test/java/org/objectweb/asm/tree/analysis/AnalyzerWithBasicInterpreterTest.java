@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,6 +46,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.test.AsmTest;
+import org.objectweb.asm.test.AsmTest.PrecompiledClass;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -53,18 +55,18 @@ import org.objectweb.asm.tree.MethodNode;
  *
  * @author Eric Bruneton
  */
-public class AnalyzerWithBasicInterpreterTest extends AsmTest {
+class AnalyzerWithBasicInterpreterTest extends AsmTest {
 
   private static final String CLASS_NAME = "C";
 
   @Test
-  public void testConstructor() {
+  void testConstructor() {
     assertDoesNotThrow(() -> new BasicInterpreter());
     assertThrows(IllegalStateException.class, () -> new BasicInterpreter() {});
   }
 
   @Test
-  public void testAnalyze_invalidNewArray() {
+  void testAnalyze_invalidNewArray() {
     MethodNode methodNode =
         new MethodNodeBuilder().iconst_0().intInsn(Opcodes.NEWARRAY, -1).vreturn().build();
 
@@ -83,8 +85,8 @@ public class AnalyzerWithBasicInterpreterTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_LATEST_API)
-  public void testAnalyze_basicInterpreter(
-      final PrecompiledClass classParameter, final Api apiParameter) throws AnalyzerException {
+  void testAnalyze_basicInterpreter(final PrecompiledClass classParameter, final Api apiParameter)
+      throws AnalyzerException {
     ClassNode classNode = new ClassNode();
     new ClassReader(classParameter.getBytes()).accept(classNode, 0);
     Analyzer<BasicValue> analyzer =
@@ -120,7 +122,7 @@ public class AnalyzerWithBasicInterpreterTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_LATEST_API)
-  public void testAnalyzeAndComputeMaxs_basicInterpreter(
+  void testAnalyzeAndComputeMaxs_basicInterpreter(
       final PrecompiledClass classParameter, final Api apiParameter) throws AnalyzerException {
     ClassNode classNode = new ClassNode();
     new ClassReader(classParameter.getBytes()).accept(classNode, 0);
@@ -138,10 +140,30 @@ public class AnalyzerWithBasicInterpreterTest extends AsmTest {
       analyzedMethodMaxs.add(new MethodMaxs(methodNode.maxStack, methodNode.maxLocals));
     }
 
+    // jdk3.SubOptimalMaxStackAndLocals has non optimal max stack and max local values on purpose.
+    assumeTrue(classParameter != PrecompiledClass.JDK3_SUB_OPTIMAL_MAX_STACK_AND_LOCALS);
     for (int i = 0; i < analyzedMethodMaxs.size(); ++i) {
       assertTrue(analyzedMethodMaxs.get(i).maxLocals >= methodMaxs.get(i).maxLocals);
       assertTrue(analyzedMethodMaxs.get(i).maxStack >= methodMaxs.get(i).maxStack);
     }
+  }
+
+  /**
+   * Tests that analyzeAndComputeMaxs computes the smallest possible maxLocals for static methods.
+   *
+   * @throws AnalyzerException if the test class can't be analyzed.
+   */
+  @Test
+  void testAnalyzeAndComputeMaxs_staticMethod() throws AnalyzerException {
+    MethodNode methodNode =
+        new MethodNodeBuilder("(I)V", /* maxStack = */ 0, /* maxLocals = */ 0).vreturn().build();
+    methodNode.access |= Opcodes.ACC_STATIC;
+    Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(new BasicInterpreter());
+
+    analyzer.analyzeAndComputeMaxs("C", methodNode);
+
+    assertEquals(1, methodNode.maxLocals);
+    assertEquals(0, methodNode.maxStack);
   }
 
   /**
@@ -152,7 +174,7 @@ public class AnalyzerWithBasicInterpreterTest extends AsmTest {
    * @throws AnalyzerException if the test class can't be analyzed.
    */
   @Test
-  public void testAnalyze_badInterpreter() {
+  void testAnalyze_badInterpreter() {
     ClassNode classNode = new ClassNode();
     new ClassReader(PrecompiledClass.JDK8_ALL_FRAMES.getBytes()).accept(classNode, 0);
     Analyzer<BasicValue> analyzer =
@@ -182,7 +204,7 @@ public class AnalyzerWithBasicInterpreterTest extends AsmTest {
    * @throws AnalyzerException if the test class can't be analyzed.
    */
   @Test
-  public void testAnalyze_mergeWithJsrReachableFromTwoDifferentPaths()
+  void testAnalyze_mergeWithJsrReachableFromTwoDifferentPaths()
       throws IOException, AnalyzerException {
     ClassReader classReader =
         new ClassReader(Files.newInputStream(Paths.get("src/test/resources/Issue316204.class")));

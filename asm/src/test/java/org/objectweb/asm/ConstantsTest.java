@@ -50,7 +50,7 @@ import org.junit.jupiter.api.function.Executable;
  *
  * @author Eric Bruneton
  */
-public class ConstantsTest {
+class ConstantsTest {
 
   private enum ConstantType {
     ASM_VERSION,
@@ -66,7 +66,7 @@ public class ConstantsTest {
   };
 
   @Test
-  public void testAsmVersions() {
+  void testAsmVersions() {
     List<Field> asmVersions = getConstants(ConstantType.ASM_VERSION);
 
     Set<Integer> asmVersionValues =
@@ -76,7 +76,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testClassVersions() {
+  void testClassVersions() {
     List<Field> classVersions = getConstants(ConstantType.CLASS_VERSION);
 
     Set<Integer> classVersionValues =
@@ -86,7 +86,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testAccessFlags() throws IllegalAccessException {
+  void testAccessFlags() throws IllegalAccessException {
     List<Field> accessFlags = getConstants(ConstantType.ACCESS_FLAG);
 
     for (Field accessFlag : accessFlags) {
@@ -96,7 +96,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testAsmAccessFlags() throws IllegalAccessException {
+  void testAsmAccessFlags() throws IllegalAccessException {
     List<Field> asmAccessFlags = getConstants(ConstantType.ASM_ACCESS_FLAG);
 
     for (Field asmAccessFlag : asmAccessFlags) {
@@ -106,7 +106,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testNewArrayTypes() {
+  void testNewArrayTypes() {
     List<Field> newArrayTypes = getConstants(ConstantType.NEW_ARRAY_TYPE);
 
     Set<Integer> newArrayTypeValues =
@@ -119,7 +119,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testReferenceKinds() {
+  void testReferenceKinds() {
     List<Field> referenceKinds = getConstants(ConstantType.REFERENCE_KIND);
 
     Set<Integer> referenceKindValues =
@@ -132,7 +132,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testFrameTypes() {
+  void testFrameTypes() {
     List<Field> frameTypes = getConstants(ConstantType.FRAME_TYPE);
 
     Set<Integer> frameTypeValues =
@@ -142,7 +142,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testVerificationTypeInfoTags() {
+  void testVerificationTypeInfoTags() {
     List<Field> verificationTypeInfoTags = getConstants(ConstantType.VERIFICATION_TYPE_INFO_TAG);
 
     Set<Integer> verificationTypeInfoTagValues =
@@ -157,7 +157,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testOpcodes() {
+  void testOpcodes() {
     List<Field> opcodes = getConstants(ConstantType.OPCODE);
 
     Set<Integer> opcodeValues =
@@ -171,7 +171,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testIsWhitelisted() {
+  void testIsWhitelisted() {
     assertFalse(Constants.isWhitelisted("org/jacoco/core/internal/flow/ClassProbesVisitor"));
     assertFalse(Constants.isWhitelisted("org/objectweb/asm/ClassWriter"));
     assertFalse(Constants.isWhitelisted("org/objectweb/asm/util/CheckClassVisitor"));
@@ -182,14 +182,14 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testCheckIsPreview_nullStream() {
+  void testCheckIsPreview_nullStream() {
     Executable checkIsPreview = () -> Constants.checkIsPreview(null);
 
     assertThrows(IllegalStateException.class, checkIsPreview);
   }
 
   @Test
-  public void testCheckIsPreview_invalidStream() {
+  void testCheckIsPreview_invalidStream() {
     InputStream invalidStream = new ByteArrayInputStream(new byte[4]);
 
     Executable checkIsPreview = () -> Constants.checkIsPreview(invalidStream);
@@ -198,7 +198,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testCheckIsPreview_nonPreviewClass() {
+  void testCheckIsPreview_nonPreviewClass() {
     InputStream nonPreviewStream = new ByteArrayInputStream(new byte[8]);
 
     Executable checkIsPreview = () -> Constants.checkIsPreview(nonPreviewStream);
@@ -207,7 +207,7 @@ public class ConstantsTest {
   }
 
   @Test
-  public void testCheckIsPreview_previewClass() {
+  void testCheckIsPreview_previewClass() {
     byte[] previewClass = new byte[] {0, 0, 0, 0, (byte) 0xFF, (byte) 0xFF};
     InputStream previewStream = new ByteArrayInputStream(previewClass);
 
@@ -264,6 +264,10 @@ public class ConstantsTest {
       case "V16":
       case "V17":
       case "V18":
+      case "V19":
+      case "V20":
+      case "V21":
+      case "V22":
         return ConstantType.CLASS_VERSION;
       case "ACC_PUBLIC":
       case "ACC_PRIVATE":

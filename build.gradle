@@ -28,28 +28,45 @@
 
 buildscript {
   repositories { mavenCentral() }
-  dependencies { classpath 'org.netbeans.tools:sigtest-maven-plugin:1.3' }
+  dependencies { classpath 'org.netbeans.tools:sigtest-maven-plugin:1.5' }
 }
 
-plugins { id 'biz.aQute.bnd.builder' version '5.2.0' apply false }
 plugins { id 'com.github.sherter.google-java-format' version '0.9' apply false }
-plugins { id 'me.champeau.gradle.jmh' version '0.5.2' apply false }
-plugins { id 'org.sonarqube' version '3.0' apply false }
+plugins { id 'me.champeau.jmh' version '0.6.8' apply false }
+plugins { id 'org.sonarqube' version '4.3.1.3277' apply false }
 
 description = 'ASM, a very small and fast Java bytecode manipulation framework'
+
+apply plugin: 'java-platform'
+dependencies {
+  constraints {
+    api project(':asm'), project(':asm-tree'), project(':asm-analysis')
+    api project(':asm-util'), project(':asm-commons')
+  }
+}
+
+allprojects {
+  group = 'org.ow2.asm'
+  version = '9.6.1' + (rootProject.hasProperty('release') ? '' : '-SNAPSHOT')
+}
 
 subprojects {
   repositories { mavenCentral() }
   apply plugin: 'java-library'
   apply plugin: 'jacoco'
-  def snapshotSuffix = rootProject.hasProperty('release') ? '' : '-SNAPSHOT'
-  group = 'org.ow2.asm'
-  version = '9.2' + snapshotSuffix
   sourceCompatibility = '1.8'
   targetCompatibility = '1.8'
   test { useJUnitPlatform() }
   ext.provides = []  // The provided java packages, e.g. ['org.objectweb.asm']
   ext.requires = []  // The required Gradle projects, e.g. [':asm-test']
+  ext.transitiveRequires = { ->
+    return requires.collect{project(it)}
+        .collect{it.transitiveRequires().plus(it.provides[0])}.flatten() as Set
+  }
+  ext.transitiveImports = { ->
+    return requires.collect{project(it)}
+        .collect{it.transitiveImports().plus(it.provides)}.flatten() as Set
+  }
   ext.depends = []   // The external dependencies, e.g. ['junit:junit:4.12']
   // Some external dependencies (such as Jacoco) depend transitively on ASM, and
   // without this rule Gradle can mix ASM jars of different versions (e.g.
@@ -75,15 +92,15 @@ project(':asm-analysis') {
 project(':asm-commons') {
   description = "Usefull class adapters based on ${parent.description}"
   provides = ['org.objectweb.asm.commons']
-  requires = [':asm', ':asm-tree', ':asm-analysis']
+  requires = [':asm', ':asm-tree']
   dependencies { testImplementation project(':asm-util') }
 }
 
 project(':asm-test') {
   description = "Utilities for testing ${parent.description}"
   provides = ['org.objectweb.asm.test']
-  depends = ['org.junit.jupiter:junit-jupiter-api:5.7.0',
-      'org.junit.jupiter:junit-jupiter-params:5.7.0']
+  depends = ['org.junit.jupiter:junit-jupiter-api:5.9.1',
+      'org.junit.jupiter:junit-jupiter-params:5.9.1']
 }
 
 project(':asm-tree') {
@@ -96,13 +113,13 @@ project(':asm-util') {
   description = "Utilities for ${parent.description}"
   provides = ['org.objectweb.asm.util']
   requires = [':asm', ':asm-tree', ':asm-analysis']
-  dependencies { testImplementation 'org.codehaus.janino:janino:3.0.11' }
+  dependencies { testImplementation 'org.codehaus.janino:janino:3.1.9' }
 }
 
 // Use "gradle benchmarks:jmh [-PjmhInclude='<regex>']" to run the benchmarks.
 project(':benchmarks') {
   description = "Benchmarks for ${rootProject.description}"
-  apply plugin: 'me.champeau.gradle.jmh'
+  apply plugin: 'me.champeau.jmh'
   dependencies {
     implementation files('libs/csg-bytecode-1.0.0.jar', 'libs/jclasslib.jar')
     jmh project(':asm'), project(':asm-tree') 
@@ -117,12 +134,12 @@ project(':benchmarks') {
     'org.javassist:javassist:3.21.0-GA',
     'org.mozilla:rhino:1.7.7.1'
   ]
-  ['4.0', '5.0.1', '6.0', '7.0', '8.0.1'].each { version ->
+  ['4.0', '5.0.1', '6.0', '7.0', '8.0.1', '9.0'].each { version ->
     configurations.create("asm${version}")
     dependencies.add("asm${version}", "org.ow2.asm:asm:${version}@jar")
     dependencies.add("asm${version}", "org.ow2.asm:asm-tree:${version}@jar")
     task "asm${version}"(type: Copy) {
-      from configurations."asm${version}".collect { zipTree(it) }
+      from configurations."asm${version}".collect{zipTree(it)}
       into "${buildDir}/asm${version}"
       duplicatesStrategy = DuplicatesStrategy.INCLUDE  // module-info.class
     }
@@ -131,16 +148,16 @@ project(':benchmarks') {
   configurations.create('input-classes-java8')
   dependencies.add('input-classes-java8', 'io.vavr:vavr:0.10.0@jar')
   task copyInputClasses(type: Copy) {
-    from configurations.'input-classes-java8'.collect { zipTree(it) }
+    from configurations.'input-classes-java8'.collect{zipTree(it)}
     into "${buildDir}/input-classes-java8"
   }
   classes.dependsOn copyInputClasses
   jmh {
-    jvmArgsAppend = "-Duser.dir=${rootDir}"
+    jvmArgsAppend = ["-Duser.dir=${rootDir}"]
     resultFormat = 'CSV'
     profilers = ['org.objectweb.asm.benchmarks.MemoryProfiler']
     if (rootProject.hasProperty('jmhInclude')) {
-      include = [jmhInclude]
+      includes = [jmhInclude]
     }
   }
 }
@@ -149,16 +166,11 @@ project(':tools') {
   description = "Tools used to build ${parent.description}"
 }
 
-project(':tools:bnd-module-plugin') {
-  description = "bnd plugin to build moduleinfo with ${rootProject.description}"
-  // TODO: this compiles asm twice (here and in :asm), find a way to avoid this.
-  sourceSets.main.java.srcDirs += project(':asm').sourceSets.main.java.srcDirs
-  depends = ['biz.aQute.bnd:biz.aQute.bnd:5.2.0']
-}
-
 project(':tools:retrofitter') {
   description = "JDK 1.5 class retrofitter based on ${rootProject.description}"
-  // TODO: this compiles asm thrice (here, above and in :asm).
+  sourceCompatibility = '1.9'
+  targetCompatibility = '1.9'
+  // TODO: this compiles asm twice (here and in :asm).
   sourceSets.main.java.srcDirs += project(':asm').sourceSets.main.java.srcDirs
 }
 
@@ -170,7 +182,7 @@ project(':tools:retrofitter') {
 // and tested with :asm-test and JUnit.
 subprojects {
   apply plugin: 'com.github.sherter.google-java-format'
-  googleJavaFormat.toolVersion = '1.9'
+  googleJavaFormat.toolVersion = '1.15.0'
   googleJavaFormat.exclude 'src/resources/java/**/*'
   
   // Check the coding style with Checkstyle. Fail in case of error or warning.
@@ -184,13 +196,15 @@ subprojects {
   pmd.ruleSets = []
   pmd.ruleSetFiles = files("${rootDir}/tools/pmd.xml")
   pmd.consoleOutput = true
+  pmdMain.dependsOn ':asm:jar'
+  pmdTest.dependsOn ':asm:jar'
 
   dependencies {
     requires.each { projectName -> api project(projectName) }
     depends.each { artifactName -> api artifactName }
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0',
-        'org.junit.jupiter:junit-jupiter-params:5.7.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.1',
+        'org.junit.jupiter:junit-jupiter-params:5.9.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.1'
     testImplementation project(':asm-test')
   }
 
@@ -203,24 +217,27 @@ subprojects {
   }
 }
 
-// Configures the projects with a non-empty 'provides' property. These are the
-// ones which are published in Maven. They must be checked for code coverage and
-// backward compatibility, retrofited to Java 1.5, packaged with biz.aQute.bnd
-// and uploaded to Maven with a POM, sources and Javadoc.
-configure(subprojects.findAll { it.provides }) {
+// Configure the projects with a non-empty 'provides' property. They must be
+// checked for code coverage and backward compatibility, retrofited to Java 1.5,
+// and packaged with generated module-info classes.
+configure(subprojects.findAll{it.provides}) {
   // Code coverage configuration.
-  jacoco.toolVersion = '0.8.7'
+  jacoco.toolVersion = '0.8.10'
   jacocoTestReport {
-    reports { xml.enabled true }
+    reports { xml.required = true }
     classDirectories.setFrom(sourceSets.main.output.classesDirs)
   }
   jacocoTestCoverageVerification {
     classDirectories.setFrom(sourceSets.main.output.classesDirs)
     violationRules.rule { limit { minimum = 0.95; counter = 'INSTRUCTION' } }
+    dependsOn ':asm:jar'
+    dependsOn ':asm-tree:jar'
+    dependsOn ':asm-commons:jar'
   }
   check.dependsOn jacocoTestCoverageVerification
 
-  // Retrofit the code to Java 1.5, in-place, in compileJava.doLast.
+  // Retrofit the code in-place to Java 1.5 and generate a module-info class
+  // from the code content, in compileJava.doLast.
   if (name != 'asm-test') {
     compileJava.dependsOn ':tools:retrofitter:classes'
     compileJava.doLast {
@@ -228,7 +245,11 @@ configure(subprojects.findAll { it.provides }) {
       def loader = new URLClassLoader(path.collect {f -> f.toURL()} as URL[])
       def retrofitter =
           loader.loadClass('org.objectweb.asm.tools.Retrofitter').newInstance()
-      retrofitter.retrofit sourceSets.main.output.classesDirs.singleFile
+      def classes = sourceSets.main.output.classesDirs.singleFile
+      def requires = transitiveRequires() as List
+      retrofitter.retrofit(classes, "${version}")
+      //[JB] Remove verification, as we don't need Java 1.5 support
+      //retrofitter.verify(classes, "${version}", provides, requires)
     }
   }
 
@@ -270,42 +291,37 @@ configure(subprojects.findAll { it.provides }) {
     }
   }
 
-  // Apply the biz.aQute.bnd plugin to package the project as an OSGi bundle, 
-  // with a custom plugin to generate and include a module-info class. Exclude
-  // the asm-test project (the DefaultPackage class prevents it from being a
-  // proper bundle).
+  jar.manifest.attributes(
+    'Implementation-Title': project.description,
+    'Implementation-Version': "${version}")
+  // Package the project as an OSGi bundle. Exclude the asm-test project (the
+  // DefaultPackage class prevents it from being a proper bundle).
   if (name != 'asm-test') {
-    apply plugin: 'biz.aQute.bnd.builder'
-    jar.dependsOn ':tools:bnd-module-plugin:jar'
+    def imports = transitiveImports()
     jar.manifest.attributes(
-      '-classpath': sourceSets.main.output.classesDirs.asPath,
-      '-plugin': 'org.objectweb.asm.tools.ModuleInfoBndPlugin;',
-      '-pluginpath': 
-          project(':tools:bnd-module-plugin').jar.outputs.files.singleFile,
-      '-removeheaders': 'Bnd-LastModified,Build-By,Created-By,Include-Resource,\
-          Require-Capability,Tool',
-      'Bundle-License': 'BSD-3-Clause;link=https://asm.ow2.io/LICENSE.txt',
       'Bundle-DocURL': 'http://asm.ow2.org',
+      'Bundle-License': 'BSD-3-Clause;link=https://asm.ow2.io/LICENSE.txt',
+      'Bundle-ManifestVersion': 2,
+      'Bundle-Name': provides[0],
       'Bundle-RequiredExecutionEnvironment': 'J2SE-1.5',
       'Bundle-SymbolicName': provides[0],
-      'Export-Package': provides.collect{"${it};version=${version}"}.join(','),
-      'Implementation-Title': project.description,
-      'Implementation-Version': "${version}",
-      'Module-Requires': 
-          requires
-              .collect{"${project(it).provides[0]};transitive=true"}
-              .join(',')
-    )
-  } else {
-    jar.manifest.attributes(
-      'Implementation-Title': project.description,
-      'Implementation-Version': "${version}")
+      'Bundle-Version': "${version}",
+      'Export-Package':
+          provides.collect{"${it};version=\"${version}\""}.join(',') +
+              (imports ? ";uses:=\"${imports.join(',')}\"" : ""))
+    if (imports) {
+      jar.manifest.attributes(
+        'Import-Package':
+            imports.collect{"${it};version=\"${version}\""}.join(','),
+        'Module-Requires': 
+            transitiveRequires().collect{"${it};transitive=true"}.join(','))
+    }
   }
 
   // Apply the SonarQube plugin to monitor the code quality of the project.
-  // Use with 'gradlew sonarqube -Dsonar.host.url=https://sonarqube.ow2.org'.
+  // Use with 'gradlew sonar -Dsonar.host.url=https://sonarqube.ow2.org'.
   apply plugin: 'org.sonarqube'
-  sonarqube {
+  sonar {
     properties { property 'sonar.projectKey', "ASM:${project.name}" }
   }
 
@@ -316,6 +332,7 @@ configure(subprojects.findAll { it.provides }) {
     classpath = configurations.compileClasspath
     destinationDir = file("${javadoc.destinationDir}-private")
     options.memberLevel = JavadocMemberLevel.PRIVATE
+    options.addBooleanOption('Xdoclint:all,-missing', true)
   }
   check.dependsOn privateJavadoc
 
@@ -323,26 +340,27 @@ configure(subprojects.findAll { it.provides }) {
   // together with the main jar (containing the compiled code).
   task javadocJar(type: Jar, dependsOn: 'javadoc') {
     from javadoc.destinationDir
-    classifier 'javadoc'
+    archiveClassifier = 'javadoc'
   }
   task sourcesJar(type: Jar, dependsOn: 'classes') {
     from sourceSets.main.allSource
-    classifier 'sources'
+    archiveClassifier = 'sources'
   }
   java {
     withJavadocJar()
     withSourcesJar()
   }
+}
 
-  // Add a publish task, provided by the maven-publish plugin, to generate and
-  // sign the project POM and to upload it, with the signed classes, sources
-  // and Javadoc jars.
+// Configure the root project, and those with a non-empty 'provides' property,
+// to be published in Maven with a POM.
+configure([rootProject] + subprojects.findAll { it.provides }) {
   apply plugin: 'maven-publish'
   apply plugin: 'signing'
   publishing {
     repositories {
       maven {
-        def baseUrl = 'http://repository.ow2.org/nexus/'
+        def baseUrl = 'https://repository.ow2.org/nexus/'
         def releasesUrl = baseUrl + 'service/local/staging/deploy/maven2'
         def snapshotsUrl = baseUrl + 'content/repositories/snapshots'
         name = 'nexus'
@@ -354,16 +372,18 @@ configure(subprojects.findAll { it.provides }) {
       }
     }
     publications {
-      mavenJava(MavenPublication) {
-        from components.java
+      maven(MavenPublication) {
+        def isRoot = project == rootProject
+        artifactId (isRoot ? 'asm-bom' : project.name)
+        from (isRoot ? components.javaPlatform : components.java)
         pom.withXml {
           def parent = asNode().appendNode('parent')
           parent.appendNode('groupId', 'org.ow2')
           parent.appendNode('artifactId', 'ow2')
-          parent.appendNode('version', '1.5')
+          parent.appendNode('version', '1.5.1')
         }
         pom {
-          name = jar.archiveBaseName
+          name = artifactId
           description = project.description
           packaging 'jar'
           inceptionYear = '2000'
@@ -426,7 +446,7 @@ configure(subprojects.findAll { it.provides }) {
   }
   signing {
     required rootProject.hasProperty('release')
-    sign publishing.publications.mavenJava
+    sign publishing.publications.maven
   }
   tasks.withType(GenerateModuleMetadata) { enabled = false }
 }

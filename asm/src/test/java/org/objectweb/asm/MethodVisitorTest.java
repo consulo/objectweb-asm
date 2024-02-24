@@ -29,6 +29,7 @@ package org.objectweb.asm;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,17 +43,17 @@ import org.objectweb.asm.test.AsmTest;
  *
  * @author Eric Bruneton
  */
-public class MethodVisitorTest extends AsmTest {
+class MethodVisitorTest extends AsmTest {
 
   @Test
-  public void testConstructor_validApi() {
+  void testConstructor_validApi() {
     Executable constructor = () -> new MethodVisitor(Opcodes.ASM4) {};
 
     assertDoesNotThrow(constructor);
   }
 
   @Test
-  public void testConstructor_invalidApi() {
+  void testConstructor_invalidApi() {
     Executable constructor = () -> new MethodVisitor(0) {};
 
     Exception exception = assertThrows(IllegalArgumentException.class, constructor);
@@ -60,7 +61,15 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitParameter_asm4Visitor() {
+  void testGetDelegate() {
+    MethodVisitor delegate = new MethodVisitor(Opcodes.ASM4) {};
+    MethodVisitor visitor = new MethodVisitor(Opcodes.ASM4, delegate) {};
+
+    assertSame(delegate, visitor.getDelegate());
+  }
+
+  @Test
+  void testVisitParameter_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitParameter = () -> methodVisitor.visitParameter(null, 0);
@@ -70,7 +79,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitTypeAnnotation_asm4Visitor() {
+  void testVisitTypeAnnotation_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitTypeAnnotation = () -> methodVisitor.visitTypeAnnotation(0, null, null, false);
@@ -80,7 +89,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitInvokeDynamicInsn_asm4Visitor() {
+  void testVisitInvokeDynamicInsn_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitInvokeDynamicInsn =
@@ -91,7 +100,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitInsnAnnotation_asm4Visitor() {
+  void testVisitInsnAnnotation_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitInsnAnnotation = () -> methodVisitor.visitInsnAnnotation(0, null, null, false);
@@ -101,7 +110,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitTryCatchAnnotation_asm4Visitor() {
+  void testVisitTryCatchAnnotation_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitTryCatchAnnotation =
@@ -113,7 +122,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_asm4Visitor() {
+  void testVisitLocalVariableAnnotation_asm4Visitor() {
     MethodVisitor methodVisitor = new MethodVisitor(Opcodes.ASM4, null) {};
 
     Executable visitLocalVariableAnnotation =
@@ -125,7 +134,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_consecutiveFrames_sameFrame() {
+  void testVisitFrame_consecutiveFrames_sameFrame() {
     ClassWriter classWriter = new ClassWriter(0);
     classWriter.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "C", null, "D", null);
     MethodVisitor methodVisitor =
@@ -139,7 +148,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_consecutiveFrames() {
+  void testVisitFrame_consecutiveFrames() {
     ClassWriter classWriter = new ClassWriter(0);
     classWriter.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "C", null, "D", null);
     MethodVisitor methodVisitor =
@@ -155,7 +164,7 @@ public class MethodVisitorTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_compressedFrameWithV1_5class() {
+  void testVisitFrame_compressedFrameWithV1_5class() {
     ClassWriter classWriter = new ClassWriter(0);
     classWriter.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "C", null, "D", null);
     MethodVisitor methodVisitor =
@@ -171,7 +180,7 @@ public class MethodVisitorTest extends AsmTest {
   /** Tests the ASM4 visitMethodInsn on an ASM4 visitor. */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_asm4Visitor() {
+  void testDeprecatedVisitMethodInsn_asm4Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
@@ -184,7 +193,7 @@ public class MethodVisitorTest extends AsmTest {
   /** Tests the ASM4 visitMethodInsn on an ASM4 visitor which overrides this method. */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_overridenAsm4Visitor() {
+  void testDeprecatedVisitMethodInsn_overridenAsm4Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
@@ -197,7 +206,7 @@ public class MethodVisitorTest extends AsmTest {
   /** Tests the ASM4 visitMethodInsn on an ASM5 visitor. */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_asm5Visitor() {
+  void testDeprecatedVisitMethodInsn_asm5Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor5(logMethodVisitor);
@@ -210,7 +219,7 @@ public class MethodVisitorTest extends AsmTest {
   /** Tests the ASM4 visitMethodInsn on an ASM5 visitor which overrides the ASM5 method. */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_overridenAsm5Visitor() {
+  void testDeprecatedVisitMethodInsn_overridenAsm5Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor5Override(logMethodVisitor, log);
@@ -226,7 +235,7 @@ public class MethodVisitorTest extends AsmTest {
    */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_userTraceMethodVisitor4() {
+  void testDeprecatedVisitMethodInsn_userTraceMethodVisitor4() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new UserTraceMethodVisitor4(logMethodVisitor, log);
@@ -244,7 +253,7 @@ public class MethodVisitorTest extends AsmTest {
    */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_userTraceMethodVisitor5() {
+  void testDeprecatedVisitMethodInsn_userTraceMethodVisitor5() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new UserTraceMethodVisitor5(logMethodVisitor, log);
@@ -262,7 +271,7 @@ public class MethodVisitorTest extends AsmTest {
    */
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_mixedVisitorChain() {
+  void testDeprecatedVisitMethodInsn_mixedVisitorChain() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor =
@@ -279,7 +288,7 @@ public class MethodVisitorTest extends AsmTest {
 
   /** Tests the ASM5 visitMethodInsn on an ASM4 visitor, with isInterface set to false. */
   @Test
-  public void testVisitMethodInsn_asm4Visitor_isNotInterface() {
+  void testVisitMethodInsn_asm4Visitor_isNotInterface() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
@@ -291,7 +300,7 @@ public class MethodVisitorTest extends AsmTest {
 
   /** Tests the ASM5 visitMethodInsn on an ASM4 visitor, with isInterface set to true. */
   @Test
-  public void testVisitMethodInsn_asm4Visitor_isInterface() {
+  void testVisitMethodInsn_asm4Visitor_isInterface() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4(logMethodVisitor);
@@ -307,7 +316,7 @@ public class MethodVisitorTest extends AsmTest {
    * isInterface set to false.
    */
   @Test
-  public void testVisitMethodInsn_overridenAsm4Visitor_isNotInterface() {
+  void testVisitMethodInsn_overridenAsm4Visitor_isNotInterface() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
@@ -322,7 +331,7 @@ public class MethodVisitorTest extends AsmTest {
    * isInterface set to true.
    */
   @Test
-  public void testVisitMethodInsn_overridenAsm4Visitor_isInterface() {
+  void testVisitMethodInsn_overridenAsm4Visitor_isInterface() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor4Override(logMethodVisitor, log);
@@ -335,7 +344,7 @@ public class MethodVisitorTest extends AsmTest {
 
   /** Tests the ASM5 visitMethodInsn on an ASM5 visitor. */
   @Test
-  public void testVisitMethodInsn_asm5Visitor() {
+  void testVisitMethodInsn_asm5Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor5(logMethodVisitor);
@@ -347,7 +356,7 @@ public class MethodVisitorTest extends AsmTest {
 
   /** Tests the ASM5 visitMethodInsn on an ASM5 visitor which overrides this method. */
   @Test
-  public void testVisitMethodInsn_overridenAsm5Visitor() {
+  void testVisitMethodInsn_overridenAsm5Visitor() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new MethodVisitor5Override(logMethodVisitor, log);
@@ -362,7 +371,7 @@ public class MethodVisitorTest extends AsmTest {
    * subclass of an ASM subclass of MethodVisitor.
    */
   @Test
-  public void testVisitMethodInsn_userTraceMethodVisitor4() {
+  void testVisitMethodInsn_userTraceMethodVisitor4() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new UserTraceMethodVisitor4(logMethodVisitor, log);
@@ -379,7 +388,7 @@ public class MethodVisitorTest extends AsmTest {
    * subclass of an ASM subclass of MethodVisitor.
    */
   @Test
-  public void testVisitMethodInsn_userTraceMethodVisitor5() {
+  void testVisitMethodInsn_userTraceMethodVisitor5() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor = new UserTraceMethodVisitor5(logMethodVisitor, log);
@@ -396,7 +405,7 @@ public class MethodVisitorTest extends AsmTest {
    * expected result, when calling the ASM5 visitMethodInsn on the first visitor.
    */
   @Test
-  public void testVisitMethodInsn_mixedVisitorChain() {
+  void testVisitMethodInsn_mixedVisitorChain() {
     StringWriter log = new StringWriter();
     LogMethodVisitor logMethodVisitor = new LogMethodVisitor(log);
     MethodVisitor methodVisitor =

@@ -30,6 +30,7 @@ package org.objectweb.asm;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * A parser to make a {@link ClassVisitor} visit a ClassFile structure, as defined in the Java
@@ -74,6 +75,13 @@ public class ClassReader {
    * degrades performance quite a lot).
    */
   public static final int EXPAND_FRAMES = 8;
+
+  // [JB] VISIT_LOCAL_VARIABLES attribute
+  /**
+   * A flag to use together with {@link #SKIP_CODE}. In this case, LocalVariableTable is parsed 
+   * and visited, but the rest of code attributes are skipped.
+   */
+  public static final int VISIT_LOCAL_VARIABLES = 0x100;
 
   /**
    * A flag to expand the ASM specific instructions into an equivalent sequence of standard bytecode
@@ -188,13 +196,14 @@ public class ClassReader {
    * @param classFileOffset the offset in byteBuffer of the first byte of the ClassFile to be read.
    * @param checkClassVersion whether to check the class version or not.
    */
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
   ClassReader(
       final byte[] classFileBuffer, final int classFileOffset, final boolean checkClassVersion) {
     this.classFileBuffer = classFileBuffer;
     this.b = classFileBuffer;
     // Check the class' major_version. This field is after the magic and minor_version fields, which
     // use 4 and 2 bytes respectively.
-    if (checkClassVersion && readShort(classFileOffset + 6) > Opcodes.V18) {
+    if (checkClassVersion && readShort(classFileOffset + 6) > Opcodes.V22) {
       //[JB: accept any version]
       //throw new IllegalArgumentException(
       //    "Unsupported class file major version " + readShort(classFileOffset + 6));
@@ -309,12 +318,13 @@ public class ClassReader {
    * @return the content of the given input stream.
    * @throws IOException if a problem occurs during reading.
    */
+  @SuppressWarnings("PMD.UseTryWithResources")
   private static byte[] readStream(final InputStream inputStream, final boolean close)
       throws IOException {
     if (inputStream == null) {
       throw new IOException("Class not found");
     }
-    int bufferSize = calculateBufferSize(inputStream);
+    int bufferSize = computeBufferSize(inputStream);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
       byte[] data = new byte[bufferSize];
       int bytesRead;
@@ -335,13 +345,12 @@ public class ClassReader {
     }
   }
 
-  private static int calculateBufferSize(final InputStream inputStream) throws IOException {
+  private static int computeBufferSize(final InputStream inputStream) throws IOException {
     int expectedLength = inputStream.available();
     /*
-     * Some implementations can return 0 while holding available data
-     * (e.g. new FileInputStream("/proc/a_file"))
-     * Also in some pathological cases a very small number might be returned,
-     * and in this case we use default size
+     * Some implementations can return 0 while holding available data (e.g. new
+     * FileInputStream("/proc/a_file")). Also in some pathological cases a very small number might
+     * be returned, and in this case we use a default size.
      */
     if (expectedLength < 256) {
       return INPUT_STREAM_DATA_CHUNK_SIZE;
@@ -376,7 +385,7 @@ public class ClassReader {
   }
 
   /**
-   * Returns the internal of name of the super class (see {@link Type#getInternalName()}). For
+   * Returns the internal name of the super class (see {@link Type#getInternalName()}). For
    * interfaces, the super class is {@link Object}.
    *
    * @return the internal name of the super class, or {@literal null} for {@link Object} class.
@@ -860,7 +869,7 @@ public class ClassReader {
       currentOffset += 2;
     }
 
-    // Read the  'provides_count' and 'provides' fields.
+    // Read the 'provides_count' and 'provides' fields.
     int providesCount = readUnsignedShort(currentOffset);
     currentOffset += 2;
     while (providesCount-- > 0) {
@@ -1299,7 +1308,8 @@ public class ClassReader {
       // The tests are sorted in decreasing frequency order (based on frequencies observed on
       // typical classes).
       if (Constants.CODE.equals(attributeName)) {
-        if ((context.parsingOptions & SKIP_CODE) == 0) {
+        // [JB] Support VISIT_LOCAL_VARIABLES
+        if ((context.parsingOptions & SKIP_CODE) == 0 || (context.parsingOptions & VISIT_LOCAL_VARIABLES) != 0) {
           codeOffset = currentOffset;
         }
       } else if (Constants.EXCEPTIONS.equals(attributeName)) {
@@ -1511,8 +1521,13 @@ public class ClassReader {
 
     // Visit the Code attribute.
     if (codeOffset != 0) {
-      methodVisitor.visitCode();
-      readCode(methodVisitor, context, codeOffset);
+      // [JB] Support VISIT_LOCAL_VARIABLES
+      if ((context.parsingOptions & SKIP_CODE) == 0) {
+        methodVisitor.visitCode();
+        readCode(methodVisitor, context, codeOffset);
+      } else {
+        readLocals(methodVisitor, context, codeOffset);
+      }
     }
 
     // Visit the end of the method.
@@ -1523,6 +1538,110 @@ public class ClassReader {
   // ----------------------------------------------------------------------------------------------
   // Methods to parse a Code attribute
   // ----------------------------------------------------------------------------------------------
+
+  // [JB] Support VISIT_LOCAL_VARIABLES
+  /**
+   * Reads local variables from a 'Code' attribute and makes the given visitor visit it.
+   *
+   * @param methodVisitor the visitor that must visit the LocalVariableTable attribute.
+   * @param context information about the class being parsed.
+   * @param codeOffset the start offset in {@link #classFileBuffer} of the Code attribute, excluding
+   *     its attribute_name_index and attribute_length fields.
+   */
+  private void readLocals(final MethodVisitor methodVisitor, final Context context, final int codeOffset) {
+    int currentOffset = codeOffset;
+
+    // Read the max_stack, max_locals and code_length fields.
+    final char[] charBuffer = context.charBuffer;
+    final int codeLength = readInt(currentOffset + 4);
+    currentOffset += 8;
+    if (codeLength > classFileBuffer.length - currentOffset) {
+      throw new IllegalArgumentException();
+    }
+
+    // Read the bytecode 'code' array to create a label for each referenced instruction.
+    final Label[] labels = context.currentMethodLabels = new Label[codeLength + 1];
+    
+    currentOffset += codeLength;
+
+    int exceptionTableLength = readUnsignedShort(currentOffset);
+    currentOffset += 2 + 8 * exceptionTableLength;
+
+    // - The offset of the LocalVariableTable attribute, or 0.
+    int localVariableTableOffset = 0;
+    // - The offset of the LocalVariableTypeTable attribute, or 0.
+    int localVariableTypeTableOffset = 0;
+
+    int attributesCount = readUnsignedShort(currentOffset);
+    currentOffset += 2;
+    while (attributesCount-- > 0) {
+      // Read the attribute_info's attribute_name and attribute_length fields.
+      String attributeName = readUTF8(currentOffset, charBuffer);
+      int attributeLength = readInt(currentOffset + 2);
+      currentOffset += 6;
+      if (Constants.LOCAL_VARIABLE_TABLE.equals(attributeName)) {
+        if ((context.parsingOptions & SKIP_DEBUG) == 0) {
+          localVariableTableOffset = currentOffset;
+          // Parse the attribute to find the corresponding (debug only) labels.
+          int currentLocalVariableTableOffset = currentOffset;
+          int localVariableTableLength = readUnsignedShort(currentLocalVariableTableOffset);
+          currentLocalVariableTableOffset += 2;
+          while (localVariableTableLength-- > 0) {
+            int startPc = readUnsignedShort(currentLocalVariableTableOffset);
+            createDebugLabel(startPc, labels);
+            int length = readUnsignedShort(currentLocalVariableTableOffset + 2);
+            createDebugLabel(startPc + length, labels);
+            // Skip the name_index, descriptor_index and index fields (2 bytes each).
+            currentLocalVariableTableOffset += 10;
+          }
+        }
+      } else if (Constants.LOCAL_VARIABLE_TYPE_TABLE.equals(attributeName)) {
+        localVariableTypeTableOffset = currentOffset;
+        // Here we do not extract the labels corresponding to the attribute content. We assume they
+        // are the same or a subset of those of the LocalVariableTable attribute.
+      }
+      currentOffset += attributeLength;
+    }
+
+    // Visit LocalVariableTable and LocalVariableTypeTable attributes.
+    if (localVariableTableOffset != 0 && (context.parsingOptions & SKIP_DEBUG) == 0) {
+      // The (start_pc, index, signature_index) fields of each entry of the LocalVariableTypeTable.
+      int[] typeTable = null;
+      if (localVariableTypeTableOffset != 0) {
+        typeTable = new int[readUnsignedShort(localVariableTypeTableOffset) * 3];
+        currentOffset = localVariableTypeTableOffset + 2;
+        int typeTableIndex = typeTable.length;
+        while (typeTableIndex > 0) {
+          // Store the offset of 'signature_index', and the value of 'index' and 'start_pc'.
+          typeTable[--typeTableIndex] = currentOffset + 6;
+          typeTable[--typeTableIndex] = readUnsignedShort(currentOffset + 8);
+          typeTable[--typeTableIndex] = readUnsignedShort(currentOffset);
+          currentOffset += 10;
+        }
+      }
+      int localVariableTableLength = readUnsignedShort(localVariableTableOffset);
+      currentOffset = localVariableTableOffset + 2;
+      while (localVariableTableLength-- > 0) {
+        int startPc = readUnsignedShort(currentOffset);
+        int length = readUnsignedShort(currentOffset + 2);
+        String name = readUTF8(currentOffset + 4, charBuffer);
+        String descriptor = readUTF8(currentOffset + 6, charBuffer);
+        int index = readUnsignedShort(currentOffset + 8);
+        currentOffset += 10;
+        String signature = null;
+        if (typeTable != null) {
+          for (int i = 0; i < typeTable.length; i += 3) {
+            if (typeTable[i] == startPc && typeTable[i + 1] == index) {
+              signature = readUTF8(typeTable[i + 2], charBuffer);
+              break;
+            }
+          }
+        }
+        methodVisitor.visitLocalVariable(
+                name, descriptor, signature, labels[startPc], labels[startPc + length], index);
+      }
+    }
+  }
 
   /**
    * Reads a JVMS 'Code' attribute and makes the given visitor visit it.
@@ -2051,6 +2170,7 @@ public class ClassReader {
     currentOffset = bytecodeStartOffset;
     while (currentOffset < bytecodeEndOffset) {
       final int currentBytecodeOffset = currentOffset - bytecodeStartOffset;
+      readBytecodeInstructionOffset(currentBytecodeOffset);
 
       // Visit the label and the line number(s) for this bytecode offset, if any.
       Label currentLabel = labels[currentBytecodeOffset];
@@ -2664,6 +2784,20 @@ public class ClassReader {
 
     // Visit the max stack and max locals values.
     methodVisitor.visitMaxs(maxStack, maxLocals);
+  }
+
+  /**
+   * Handles the bytecode offset of the next instruction to be visited in {@link
+   * #accept(ClassVisitor,int)}. This method is called just before the instruction and before its
+   * associated label and stack map frame, if any. The default implementation of this method does
+   * nothing. Subclasses can override this method to store the argument in a mutable field, for
+   * instance, so that {@link MethodVisitor} instances can get the bytecode offset of each visited
+   * instruction (if so, the usual concurrency issues related to mutable data should be addressed).
+   *
+   * @param bytecodeOffset the bytecode offset of the next instruction to be visited.
+   */
+  protected void readBytecodeInstructionOffset(final int bytecodeOffset) {
+    // Do nothing by default.
   }
 
   /**
@@ -3690,20 +3824,30 @@ public class ClassReader {
         readUtf(cpInfoOffset + 2, readUnsignedShort(cpInfoOffset), charBuffer);
   }
 
+  // [JB] Optimized readUtf implementation
   /**
-   * Reads an UTF8 string in {@link #classFileBuffer}.
+   * Reads an UTF8 string in {@link #classFileBuffer} (the slow path when string contains a non-ASCII character).
    *
-   * @param utfOffset the start offset of the UTF8 string to be read.
-   * @param utfLength the length of the UTF8 string to be read.
-   * @param charBuffer the buffer to be used to read the string. This buffer must be sufficiently
-   *     large. It is not automatically resized.
+   * @param utfOffset           the start offset of the UTF8 string to be read.
+   * @param firstNonAsciiOffset the offset of the first non-ASCII character. The characters between utfOffset and
+   *                            firstNonAsciiOffset are assumed to be ASCII and not checked.
+   * @param utfLength           the length of the UTF8 string to be read.
+   * @param charBuffer          the buffer to be used to read the string. This buffer must be sufficiently
+   *                            large. It is not automatically resized.
    * @return the String corresponding to the specified UTF8 string.
    */
-  private String readUtf(final int utfOffset, final int utfLength, final char[] charBuffer) {
+  private String readUtfNonAscii(
+          final int utfOffset,
+          final int firstNonAsciiOffset,
+          final int utfLength,
+          final char[] charBuffer) {
     int currentOffset = utfOffset;
     int endOffset = currentOffset + utfLength;
     int strLength = 0;
     byte[] classBuffer = classFileBuffer;
+    while (currentOffset < firstNonAsciiOffset) {
+      charBuffer[strLength++] = (char) classBuffer[currentOffset++];
+    }
     while (currentOffset < endOffset) {
       int currentByte = classBuffer[currentOffset++];
       if ((currentByte & 0x80) == 0) {
@@ -3720,6 +3864,26 @@ public class ClassReader {
       }
     }
     return new String(charBuffer, 0, strLength);
+  }
+
+  /**
+   * Reads an UTF8 string in {@link #classFileBuffer}.
+   *
+   * @param utfOffset  the start offset of the UTF8 string to be read.
+   * @param utfLength  the length of the UTF8 string to be read.
+   * @param charBuffer the buffer to be used to read the string. This buffer must be sufficiently
+   *                   large. It is not automatically resized.
+   * @return the String corresponding to the specified UTF8 string.
+   */
+  private String readUtf(final int utfOffset, final int utfLength, final char[] charBuffer) {
+    int endOffset = utfOffset + utfLength;
+    byte[] classBuffer = classFileBuffer;
+    for (int currentOffset = utfOffset; currentOffset < endOffset; currentOffset++) {
+      if (classBuffer[currentOffset] < 0) {
+        return readUtfNonAscii(utfOffset, currentOffset, utfLength, charBuffer);
+      }
+    }
+    return new String(classFileBuffer, utfOffset, utfLength, StandardCharsets.ISO_8859_1);
   }
 
   /**

@@ -50,6 +50,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.test.AsmTest;
 import org.objectweb.asm.test.ClassFile;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.util.CheckMethodAdapter;
 
@@ -58,10 +59,10 @@ import org.objectweb.asm.util.CheckMethodAdapter;
  *
  * @author Eric Bruneton
  */
-public class ClassRemapperTest extends AsmTest {
+class ClassRemapperTest extends AsmTest {
 
   @Test
-  public void testVisit() {
+  void testVisit() {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(classNode, new SimpleRemapper("pkg/C", "new/pkg/C"));
@@ -72,7 +73,7 @@ public class ClassRemapperTest extends AsmTest {
   }
 
   @Test
-  public void testVisitAnnotation() {
+  void testVisitAnnotation() {
     ClassNode classNode = new ClassNode();
     ClassRemapper remapper =
         new ClassRemapper(
@@ -94,7 +95,7 @@ public class ClassRemapperTest extends AsmTest {
   }
 
   @Test
-  public void testVisitInnerClass() {
+  void testVisitInnerClass() {
     ClassNode classNode = new ClassNode();
     ClassRemapper remapper =
         new ClassRemapper(
@@ -121,7 +122,7 @@ public class ClassRemapperTest extends AsmTest {
   }
 
   @Test
-  public void testVisitInnerClass_localInnerClass() {
+  void testVisitInnerClass_localInnerClass() {
     ClassNode classNode = new ClassNode();
     ClassRemapper remapper =
         new ClassRemapper(
@@ -148,7 +149,34 @@ public class ClassRemapperTest extends AsmTest {
   }
 
   @Test
-  public void testVisitAttribute_moduleHashes() {
+  void testVisitInnerClass_specialRemap() {
+    ClassNode classNode = new ClassNode();
+    ClassRemapper remapper =
+        new ClassRemapper(
+            classNode,
+            new Remapper() {
+              @Override
+              public String map(final String internalName) {
+                if ("pkg/C".equals(internalName)) {
+                  return "pkg2/C";
+                }
+                if ("pkg/C$$a".equals(internalName)) {
+                  return "pkg2/C$$a";
+                }
+                return internalName;
+              }
+            });
+    remapper.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "pkg/C", null, "java/lang/Object", null);
+
+    remapper.visitInnerClass("pkg/C$$a", "pkg/C", "$a", Opcodes.ACC_PUBLIC);
+
+    assertEquals("pkg2/C$$a", classNode.innerClasses.get(0).name);
+    assertEquals("pkg2/C", classNode.innerClasses.get(0).outerName);
+    assertEquals("$a", classNode.innerClasses.get(0).innerName);
+  }
+
+  @Test
+  void testVisitAttribute_moduleHashes() {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(
@@ -169,7 +197,7 @@ public class ClassRemapperTest extends AsmTest {
   }
 
   @Test
-  public void testVisitLdcInsn_constantDynamic() {
+  void testVisitLdcInsn_constantDynamic() {
     ClassNode classNode = new ClassNode();
     ClassRemapper classRemapper =
         new ClassRemapper(
@@ -209,10 +237,42 @@ public class ClassRemapperTest extends AsmTest {
     assertEquals("()Ljava/lang/Integer;", constantDynamic.getBootstrapMethod().getDesc());
   }
 
+  @Test
+  void testInvokeDynamicInsn_field() {
+    ClassNode classNode = new ClassNode();
+    ClassRemapper classRemapper =
+        new ClassRemapper(
+            /* latest api */ Opcodes.ASM9,
+            classNode,
+            new Remapper() {
+              @Override
+              public String mapFieldName(
+                  final String owner, final String name, final String descriptor) {
+                if ("a".equals(name)) {
+                  return "demo";
+                }
+                return name;
+              }
+            });
+    classRemapper.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "C", null, "java/lang/Object", null);
+    MethodVisitor methodVisitor =
+        classRemapper.visitMethod(Opcodes.ACC_PUBLIC, "hello", "()V", null, null);
+    methodVisitor.visitCode();
+
+    methodVisitor.visitInvokeDynamicInsn(
+        "foo",
+        "()Ljava/lang/String;",
+        new Handle(Opcodes.H_GETFIELD, "pkg/B", "a", "Ljava/lang/String;", false));
+
+    InvokeDynamicInsnNode invokeDynamic =
+        (InvokeDynamicInsnNode) classNode.methods.get(0).instructions.get(0);
+    assertEquals("demo", invokeDynamic.bsm.getName());
+  }
+
   /** Tests that classes transformed with a ClassRemapper can be loaded and instantiated. */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAllMethods_precompiledClass(
+  void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassWriter classWriter = new ClassWriter(0);
@@ -242,7 +302,7 @@ public class ClassRemapperTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAllMethods_precompiledClass_fromClassNode(
+  void testAllMethods_precompiledClass_fromClassNode(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassNode classNode = new ClassNode();
     new ClassReader(classParameter.getBytes()).accept(classNode, 0);

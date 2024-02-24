@@ -58,16 +58,18 @@ import org.objectweb.asm.util.TraceMethodVisitor;
  *
  * @author Eric Bruneton
  */
-public class InstructionAdapterTest extends AsmTest {
+class InstructionAdapterTest extends AsmTest {
 
   @Test
-  public void testConstructor() {
-    assertDoesNotThrow(() -> new InstructionAdapter(new MethodNode()));
-    assertThrows(IllegalStateException.class, () -> new InstructionAdapter(new MethodNode()) {});
+  void testConstructor() {
+    MethodNode methodNode = new MethodNode();
+
+    assertDoesNotThrow(() -> new InstructionAdapter(methodNode));
+    assertThrows(IllegalStateException.class, () -> new InstructionAdapter(methodNode) {});
   }
 
   @Test
-  public void testVisitInsn_illegalArgument() {
+  void testVisitInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitInsn = () -> instructionAdapter.visitInsn(Opcodes.GOTO);
@@ -76,7 +78,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitIntInsn_illegalArgument() {
+  void testVisitIntInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitIntInsn = () -> instructionAdapter.visitIntInsn(Opcodes.GOTO, 0);
@@ -85,7 +87,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitIntInsn_illegalNewArrayArgument() {
+  void testVisitIntInsn_illegalNewArrayArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitIntInsn = () -> instructionAdapter.visitIntInsn(Opcodes.NEWARRAY, 0);
@@ -94,7 +96,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitVarInsn_illegalArgument() {
+  void testVisitVarInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitVarInsn = () -> instructionAdapter.visitVarInsn(Opcodes.GOTO, 0);
@@ -103,7 +105,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitTypeInsn_illegalArgument() {
+  void testVisitTypeInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitTypeInsn = () -> instructionAdapter.visitTypeInsn(Opcodes.GOTO, "pkg/Class");
@@ -112,7 +114,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFieldInsn_illegalArgument() {
+  void testVisitFieldInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitFieldInsn =
@@ -123,7 +125,7 @@ public class InstructionAdapterTest extends AsmTest {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_illegalArgument() {
+  void testDeprecatedVisitMethodInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitMethodInsn =
@@ -133,7 +135,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitMethodInsn_illegalArgument() {
+  void testVisitMethodInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitMethodInsn =
@@ -143,7 +145,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitJumpInsn_illegalArgument() {
+  void testVisitJumpInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitJumpInsn = () -> instructionAdapter.visitJumpInsn(Opcodes.NOP, new Label());
@@ -152,7 +154,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitLdcInsn() {
+  void testVisitLdcInsn() {
     Textifier textifier = new Textifier();
     InstructionAdapter instructionAdapter =
         new InstructionAdapter(new TraceMethodVisitor(textifier));
@@ -180,7 +182,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitLdcInsn_illegalArgument() {
+  void testVisitLdcInsn_illegalArgument() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(new MethodNode());
 
     Executable visitLdcInsn = () -> instructionAdapter.visitLdcInsn(new Object());
@@ -190,7 +192,7 @@ public class InstructionAdapterTest extends AsmTest {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedInvokeSpecial() {
+  void testDeprecatedInvokeSpecial() {
     MethodNode methodNode = new MethodNode();
     InstructionAdapter instructionAdapter = new InstructionAdapter(methodNode);
 
@@ -200,7 +202,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testInvokeSpecial_unsupportedOperation() {
+  void testInvokeSpecial_unsupportedOperation() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(Opcodes.ASM4, null);
 
     Executable invokeSpecial =
@@ -211,7 +213,7 @@ public class InstructionAdapterTest extends AsmTest {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedInvokeVirtual() {
+  void testDeprecatedInvokeVirtual() {
     MethodNode methodNode = new MethodNode();
     InstructionAdapter instructionAdapter = new InstructionAdapter(methodNode);
 
@@ -221,7 +223,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testInvokeVirtual_unsupportedOperation() {
+  void testInvokeVirtual_unsupportedOperation() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(Opcodes.ASM4, null);
 
     Executable invokeVirtual =
@@ -232,7 +234,7 @@ public class InstructionAdapterTest extends AsmTest {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedInvokeStatic() {
+  void testDeprecatedInvokeStatic() {
     MethodNode methodNode = new MethodNode();
     InstructionAdapter instructionAdapter = new InstructionAdapter(methodNode);
 
@@ -242,7 +244,7 @@ public class InstructionAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testInvokeStatic_unsupportedOperation() {
+  void testInvokeStatic_unsupportedOperation() {
     InstructionAdapter instructionAdapter = new InstructionAdapter(Opcodes.ASM4, null);
 
     Executable invokeStatic =
@@ -254,7 +256,7 @@ public class InstructionAdapterTest extends AsmTest {
   /** Tests that classes transformed with an InstructionAdapter are unchanged. */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAllMethods_precompiledClass(
+  void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);

@@ -37,6 +37,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.test.AsmTest;
 import org.objectweb.asm.tree.ClassNode;
@@ -47,18 +48,18 @@ import org.objectweb.asm.tree.MethodNode;
  *
  * @author Eric Bruneton
  */
-public class AnalyzerWithBasicVerifierTest extends AsmTest {
+class AnalyzerWithBasicVerifierTest extends AsmTest {
 
   private static final String CLASS_NAME = "C";
 
   @Test
-  public void testConstructor() {
+  void testConstructor() {
     assertDoesNotThrow(() -> new BasicVerifier());
     assertThrows(IllegalStateException.class, () -> new BasicVerifier() {});
   }
 
   @Test
-  public void testAnalyze_invalidAload() {
+  void testAnalyze_invalidAload() {
     MethodNode methodNode = new MethodNodeBuilder().iconst_0().istore(1).aload(1).vreturn().build();
 
     Executable analyze = () -> newAnalyzer().analyze(CLASS_NAME, methodNode);
@@ -68,7 +69,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidAstore() {
+  void testAnalyze_invalidAstore() {
     MethodNode methodNode = new MethodNodeBuilder().iconst_0().astore(1).vreturn().build();
 
     Executable analyze = () -> newAnalyzer().analyze(CLASS_NAME, methodNode);
@@ -78,7 +79,33 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidIstore() {
+  void testAnalyze_invalidIloadDueToLastInstructionOfExceptionHandler() {
+    Label startTryLabel = new Label();
+    Label endTryLabel = new Label();
+    Label catchLabel = new Label();
+    MethodNode methodNode =
+        new MethodNodeBuilder()
+            .trycatch(startTryLabel, endTryLabel, catchLabel)
+            .iconst_0()
+            .istore(1)
+            .label(startTryLabel)
+            .aconst_null()
+            .astore(1)
+            .label(endTryLabel)
+            .vreturn()
+            .label(catchLabel)
+            .iload(1)
+            .vreturn()
+            .build();
+
+    Executable analyze = () -> newAnalyzer().analyze(CLASS_NAME, methodNode);
+
+    String message = assertThrows(AnalyzerException.class, analyze).getMessage();
+    assertTrue(message.contains("Error at instruction 8: Expected I, but found ."));
+  }
+
+  @Test
+  void testAnalyze_invalidIstore() {
     MethodNode methodNode = new MethodNodeBuilder().aconst_null().istore(1).vreturn().build();
 
     Executable analyze = () -> newAnalyzer().analyze(CLASS_NAME, methodNode);
@@ -88,7 +115,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidCheckcast() {
+  void testAnalyze_invalidCheckcast() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .iconst_0()
@@ -103,7 +130,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidArraylength() {
+  void testAnalyze_invalidArraylength() {
     MethodNode methodNode =
         new MethodNodeBuilder().iconst_0().insn(Opcodes.ARRAYLENGTH).vreturn().build();
 
@@ -114,7 +141,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidAthrow() {
+  void testAnalyze_invalidAthrow() {
     MethodNode methodNode =
         new MethodNodeBuilder().iconst_0().insn(Opcodes.ATHROW).vreturn().build();
 
@@ -125,7 +152,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidIneg() {
+  void testAnalyze_invalidIneg() {
     MethodNode methodNode =
         new MethodNodeBuilder().insn(Opcodes.FCONST_0).insn(Opcodes.INEG).vreturn().build();
 
@@ -136,7 +163,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidIadd() {
+  void testAnalyze_invalidIadd() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .insn(Opcodes.FCONST_0)
@@ -152,7 +179,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidIastore() {
+  void testAnalyze_invalidIastore() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .insn(Opcodes.ICONST_1)
@@ -170,7 +197,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidFastore() {
+  void testAnalyze_invalidFastore() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .insn(Opcodes.ICONST_1)
@@ -188,7 +215,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidLastore() {
+  void testAnalyze_invalidLastore() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .insn(Opcodes.ICONST_1)
@@ -205,7 +232,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
   }
 
   @Test
-  public void testAnalyze_invalidMultianewarray() {
+  void testAnalyze_invalidMultianewarray() {
     MethodNode methodNode =
         new MethodNodeBuilder()
             .insn(Opcodes.FCONST_1)
@@ -227,8 +254,7 @@ public class AnalyzerWithBasicVerifierTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_LATEST_API)
-  public void testAnalyze_basicVerifier(
-      final PrecompiledClass classParameter, final Api apiParameter) {
+  void testAnalyze_basicVerifier(final PrecompiledClass classParameter, final Api apiParameter) {
     ClassNode classNode = new ClassNode();
     new ClassReader(classParameter.getBytes()).accept(classNode, 0);
     Analyzer<BasicValue> analyzer = newAnalyzer();

@@ -51,7 +51,7 @@ public class AsmAdapter extends Adapter {
 
   @Override
   public String getVersion() {
-    for (int i = 8; i >= 4; --i) {
+    for (int i = 9; i >= 4; --i) {
       try {
         String version = "ASM" + i;
         if (Opcodes.class.getField(version) != null) {
@@ -304,7 +304,7 @@ public class AsmAdapter extends Adapter {
         }
 
         @Override
-        public void visitVarInsn(final int opcode, final int var) {
+        public void visitVarInsn(final int opcode, final int varIndex) {
           ++count;
         }
 
@@ -361,7 +361,7 @@ public class AsmAdapter extends Adapter {
         }
 
         @Override
-        public void visitIincInsn(final int var, final int increment) {
+        public void visitIincInsn(final int varIndex, final int increment) {
           ++count;
         }
 

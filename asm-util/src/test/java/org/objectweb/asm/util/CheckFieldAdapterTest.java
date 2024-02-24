@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypeReference;
 import org.objectweb.asm.test.AsmTest;
 
@@ -42,16 +41,16 @@ import org.objectweb.asm.test.AsmTest;
  *
  * @author Eric Bruneton
  */
-public class CheckFieldAdapterTest extends AsmTest implements Opcodes {
+class CheckFieldAdapterTest extends AsmTest {
 
   @Test
-  public void testConstructor() {
+  void testConstructor() {
     assertDoesNotThrow(() -> new CheckFieldAdapter(null));
     assertThrows(IllegalStateException.class, () -> new CheckFieldAdapter(null) {});
   }
 
   @Test
-  public void testVisitTypeAnnotation_illegalTypeAnnotation() {
+  void testVisitTypeAnnotation_illegalTypeAnnotation() {
     CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
 
     Executable visitTypeAnnotation =
@@ -64,7 +63,7 @@ public class CheckFieldAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitAttribute_illegalAttribute() {
+  void testVisitAttribute_illegalAttribute() {
     CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
 
     Executable visitAttribute = () -> checkFieldAdapter.visitAttribute(null);
@@ -74,7 +73,7 @@ public class CheckFieldAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitAttribute_afterEnd() {
+  void testVisitAttribute_afterEnd() {
     CheckFieldAdapter checkFieldAdapter = new CheckFieldAdapter(null);
     checkFieldAdapter.visitEnd();
 

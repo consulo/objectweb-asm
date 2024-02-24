@@ -55,18 +55,20 @@ import org.objectweb.asm.tree.MethodNode;
  *
  * @author Eric Bruneton
  */
-public class LocalVariablesSorterTest extends AsmTest {
+class LocalVariablesSorterTest extends AsmTest {
 
   @Test
-  public void testConstructor() {
-    assertDoesNotThrow(() -> new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", new MethodNode()));
+  void testConstructor() {
+    MethodNode methodNode = new MethodNode();
+
+    assertDoesNotThrow(() -> new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", methodNode));
     assertThrows(
         IllegalStateException.class,
-        () -> new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", new MethodNode()) {});
+        () -> new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", methodNode) {});
   }
 
   @Test
-  public void testVisitFrame_emptyFrame() {
+  void testVisitFrame_emptyFrame() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", new MethodNode());
 
@@ -76,7 +78,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_invalidFrameType() {
+  void testVisitFrame_invalidFrameType() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_PUBLIC, "()V", new MethodNode());
 
@@ -89,7 +91,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_boolean() {
+  void testNewLocal_boolean() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -99,7 +101,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_byte() {
+  void testNewLocal_byte() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -109,7 +111,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_char() {
+  void testNewLocal_char() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -119,7 +121,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_short() {
+  void testNewLocal_short() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -129,7 +131,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_int() {
+  void testNewLocal_int() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -139,7 +141,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_float() {
+  void testNewLocal_float() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -149,7 +151,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_long() {
+  void testNewLocal_long() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -158,7 +160,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_double() {
+  void testNewLocal_double() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -168,7 +170,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_object() {
+  void testNewLocal_object() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -178,7 +180,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testNewLocal_array() {
+  void testNewLocal_array() {
     LocalVariablesSorter localVariablesSorter =
         new LocalVariablesSorter(Opcodes.ACC_STATIC, "()V", new MethodNode());
 
@@ -189,7 +191,7 @@ public class LocalVariablesSorterTest extends AsmTest {
 
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAllMethods_precompiledClass(
+  void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassWriter classWriter = new ClassWriter(0);
@@ -213,7 +215,7 @@ public class LocalVariablesSorterTest extends AsmTest {
   }
 
   @Test
-  public void testAllMethods_issue317586() throws FileNotFoundException, IOException {
+  void testAllMethods_issue317586() throws FileNotFoundException, IOException {
     ClassReader classReader =
         new ClassReader(Files.newInputStream(Paths.get("src/test/resources/Issue317586.class")));
     ClassWriter classWriter = new ClassWriter(0);

@@ -53,10 +53,10 @@ import org.objectweb.asm.test.ClassFile;
  *
  * @author Eric Bruneton
  */
-public class AnalyzerAdapterTest extends AsmTest {
+class AnalyzerAdapterTest extends AsmTest {
 
   @Test
-  public void testConstructor() {
+  void testConstructor() {
     assertDoesNotThrow(
         () -> new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null));
     assertThrows(
@@ -65,7 +65,7 @@ public class AnalyzerAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_emptyFrame() {
+  void testVisitFrame_emptyFrame() {
     AnalyzerAdapter analyzerAdapter =
         new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null);
 
@@ -75,7 +75,7 @@ public class AnalyzerAdapterTest extends AsmTest {
   }
 
   @Test
-  public void testVisitFrame_invalidFrameType() {
+  void testVisitFrame_invalidFrameType() {
     AnalyzerAdapter analyzerAdapter =
         new AnalyzerAdapter("pkg/Class", Opcodes.ACC_PUBLIC, "name", "()V", null);
 
@@ -94,7 +94,7 @@ public class AnalyzerAdapterTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource(ALL_CLASSES_AND_ALL_APIS)
-  public void testAllMethods_precompiledClass(
+  void testAllMethods_precompiledClass(
       final PrecompiledClass classParameter, final Api apiParameter) throws Exception {
     byte[] classFile = classParameter.getBytes();
     ClassReader classReader = new ClassReader(classFile);
@@ -243,9 +243,9 @@ public class AnalyzerAdapterTest extends AsmTest {
     }
 
     @Override
-    public void visitVarInsn(final int opcode, final int var) {
+    public void visitVarInsn(final int opcode, final int varIndex) {
       maybeInsertFrame();
-      super.visitVarInsn(opcode, var);
+      super.visitVarInsn(opcode, varIndex);
     }
 
     @Override
@@ -296,9 +296,9 @@ public class AnalyzerAdapterTest extends AsmTest {
     }
 
     @Override
-    public void visitIincInsn(final int var, final int increment) {
+    public void visitIincInsn(final int varIndex, final int increment) {
       maybeInsertFrame();
-      super.visitIincInsn(var, increment);
+      super.visitIincInsn(varIndex, increment);
     }
 
     @Override

@@ -29,6 +29,7 @@ package org.objectweb.asm;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,21 +45,29 @@ import org.objectweb.asm.test.ClassFile;
  *
  * @author Eric Bruneton
  */
-public class AnnotationVisitorTest extends AsmTest {
+class AnnotationVisitorTest extends AsmTest {
 
   @Test
-  public void testConstructor_validApi() {
+  void testConstructor_validApi() {
     Executable constructor = () -> new AnnotationVisitor(Opcodes.ASM4) {};
 
     assertDoesNotThrow(constructor);
   }
 
   @Test
-  public void testConstructor_invalidApi() {
+  void testConstructor_invalidApi() {
     Executable constructor = () -> new AnnotationVisitor(0) {};
 
     Exception exception = assertThrows(IllegalArgumentException.class, constructor);
     assertEquals("Unsupported api 0", exception.getMessage());
+  }
+
+  @Test
+  void testGetDelegate() {
+    AnnotationVisitor delegate = new AnnotationVisitor(Opcodes.ASM4) {};
+    AnnotationVisitor visitor = new AnnotationVisitor(Opcodes.ASM4, delegate) {};
+
+    assertSame(delegate, visitor.getDelegate());
   }
 
   /**
@@ -67,7 +76,7 @@ public class AnnotationVisitorTest extends AsmTest {
    */
   @ParameterizedTest
   @MethodSource("allClassesAndAllApis")
-  public void testReadAndWrite_removeOrDeleteAnnotations(
+  void testReadAndWrite_removeOrDeleteAnnotations(
       final PrecompiledClass classParameter, final Api apiParameter) {
     ClassReader classReader = new ClassReader(classParameter.getBytes());
     ClassWriter removedAnnotationsClassWriter = new ClassWriter(0);

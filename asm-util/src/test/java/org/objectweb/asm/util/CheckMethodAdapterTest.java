@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -48,12 +49,12 @@ import org.objectweb.asm.test.AsmTest;
  *
  * @author Eric Bruneton
  */
-public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
+class CheckMethodAdapterTest extends AsmTest implements Opcodes {
 
   private final CheckMethodAdapter checkMethodAdapter = new CheckMethodAdapter(null);
 
   @Test
-  public void testConstructor() {
+  void testConstructor() {
     assertDoesNotThrow(() -> new CheckMethodAdapter(null));
     assertThrows(IllegalStateException.class, () -> new CheckMethodAdapter(null) {});
     assertThrows(
@@ -61,7 +62,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTypeAnnotation_illegalTypeRef() {
+  void testVisitTypeAnnotation_illegalTypeRef() {
     Executable visitTypeAnnotation =
         () -> checkMethodAdapter.visitTypeAnnotation(0xFFFFFFFF, null, "LA;", true);
 
@@ -70,7 +71,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitParameterAnnotation_invisibleAnnotation_illegalParameterIndex() {
+  void testVisitParameterAnnotation_invisibleAnnotation_illegalParameterIndex() {
     checkMethodAdapter.visitAnnotableParameterCount(1, false);
 
     Executable visitParameterAnnotation =
@@ -81,7 +82,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitParameterAnnotation_visibleAnnotation_illegalParameterIndex() {
+  void testVisitParameterAnnotation_visibleAnnotation_illegalParameterIndex() {
     checkMethodAdapter.visitAnnotableParameterCount(2, true);
 
     Executable visitParameterAnnotation =
@@ -92,7 +93,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitParameterAnnotation_illegalDescriptor() {
+  void testVisitParameterAnnotation_illegalDescriptor() {
     Executable visitParameterAnnotation =
         () -> checkMethodAdapter.visitParameterAnnotation(0, "'", true);
 
@@ -101,7 +102,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitAttribute_afterEnd() {
+  void testVisitAttribute_afterEnd() {
     checkMethodAdapter.visitEnd();
 
     Executable visitAttribute = () -> checkMethodAdapter.visitAttribute(new Comment());
@@ -111,7 +112,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitAttribute_nullAttribute() {
+  void testVisitAttribute_nullAttribute() {
     Executable visitAttribute = () -> checkMethodAdapter.visitAttribute(null);
 
     Exception exception = assertThrows(IllegalArgumentException.class, visitAttribute);
@@ -119,7 +120,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitCode_abstractMethod() {
+  void testVisitCode_abstractMethod() {
     CheckMethodAdapter checkAbstractMethodAdapter =
         new CheckMethodAdapter(Opcodes.ACC_ABSTRACT, "m", "()V", null, new HashMap<>());
 
@@ -130,7 +131,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalFrameType() {
+  void testVisitFrame_illegalFrameType() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame = () -> checkMethodAdapter.visitFrame(123, 0, null, 0, null);
@@ -140,7 +141,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalLocalCount() {
+  void testVisitFrame_illegalLocalCount() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame =
@@ -151,7 +152,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalStackCount() {
+  void testVisitFrame_illegalStackCount() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame =
@@ -162,7 +163,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalLocalArray() {
+  void testVisitFrame_illegalLocalArray() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame =
@@ -173,7 +174,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalStackArray() {
+  void testVisitFrame_illegalStackArray() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame = () -> checkMethodAdapter.visitFrame(F_SAME1, 0, null, 1, new Object[0]);
@@ -183,7 +184,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalDescriptor() {
+  void testVisitFrame_illegalDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFrame =
@@ -196,7 +197,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalPrimitiveType() {
+  void testVisitFrame_illegalPrimitiveType() {
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitInsn(NOP);
     Integer invalidFrameValue =
@@ -210,19 +211,19 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFrame_illegalValueClass() {
+  void testVisitFrame_illegalValueClass() {
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitInsn(NOP);
 
     Executable visitFrame =
-        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {new Float(0.0f)}, 0, null);
+        () -> checkMethodAdapter.visitFrame(F_FULL, 1, new Object[] {Float.valueOf(0.0f)}, 0, null);
 
     Exception exception = assertThrows(IllegalArgumentException.class, visitFrame);
     assertEquals("Invalid stack frame value: 0.0", exception.getMessage());
   }
 
   @Test
-  public void testVisitFrame_illegalMixedFrameTypes() {
+  void testVisitFrame_illegalMixedFrameTypes() {
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitFrame(F_NEW, 0, null, 0, null);
     checkMethodAdapter.visitInsn(NOP);
@@ -234,7 +235,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitInsn_beforeStart() {
+  void testVisitInsn_beforeStart() {
     Executable visitInsn = () -> checkMethodAdapter.visitInsn(NOP);
 
     Exception exception = assertThrows(IllegalStateException.class, visitInsn);
@@ -243,7 +244,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitInsn_IllegalInsnVisitAfterEnd() {
+  void testVisitInsn_IllegalInsnVisitAfterEnd() {
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitMaxs(0, 0);
 
@@ -255,7 +256,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitIntInsn_illegalOpcode() {
+  void testVisitIntInsn_illegalOpcode() {
     checkMethodAdapter.visitCode();
 
     Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(-1, 0);
@@ -265,7 +266,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitIntInsn_illegalOperand() {
+  void testVisitIntInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
 
     Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(NEWARRAY, 0);
@@ -275,7 +276,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitIntInsn_illegalByteOperand() {
+  void testVisitIntInsn_illegalByteOperand() {
     checkMethodAdapter.visitCode();
 
     Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(BIPUSH, Integer.MAX_VALUE);
@@ -285,7 +286,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitIntInsn_illegalShortOperand() {
+  void testVisitIntInsn_illegalShortOperand() {
     checkMethodAdapter.visitCode();
 
     Executable visitIntInsn = () -> checkMethodAdapter.visitIntInsn(SIPUSH, Integer.MAX_VALUE);
@@ -295,7 +296,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitVarInsn_illegalOperand() {
+  void testVisitVarInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
 
     Executable visitVarInsn = () -> checkMethodAdapter.visitVarInsn(ALOAD, -1);
@@ -306,7 +307,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTypeInsn_illegalOperand() {
+  void testVisitTypeInsn_illegalOperand() {
     checkMethodAdapter.visitCode();
 
     Executable visitTypeInsn = () -> checkMethodAdapter.visitTypeInsn(NEW, "[I");
@@ -316,7 +317,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_nullOwner() {
+  void testVisitFieldInsn_nullOwner() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, null, "i", "I");
@@ -326,7 +327,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidOwnerDescriptor() {
+  void testVisitFieldInsn_invalidOwnerDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "-", "i", "I");
@@ -336,7 +337,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_nullName() {
+  void testVisitFieldInsn_nullName() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", null, "I");
@@ -346,7 +347,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidFieldName() {
+  void testVisitFieldInsn_invalidFieldName() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "-", "I");
@@ -356,7 +357,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidFieldName2() {
+  void testVisitFieldInsn_invalidFieldName2() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "a-", "I");
@@ -366,7 +367,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_nullDescriptor() {
+  void testVisitFieldInsn_nullDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", null);
@@ -376,7 +377,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_voidDescriptor() {
+  void testVisitFieldInsn_voidDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "V");
@@ -386,7 +387,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidPrimitiveDescriptor() {
+  void testVisitFieldInsn_invalidPrimitiveDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "II");
@@ -396,7 +397,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_illegalArrayDescriptor() {
+  void testVisitFieldInsn_illegalArrayDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "[");
@@ -406,7 +407,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidReferenceDescriptor() {
+  void testVisitFieldInsn_invalidReferenceDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L");
@@ -416,7 +417,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitFieldInsn_invalidReferenceDescriptor2() {
+  void testVisitFieldInsn_invalidReferenceDescriptor2() {
     checkMethodAdapter.visitCode();
 
     Executable visitFieldInsn = () -> checkMethodAdapter.visitFieldInsn(GETFIELD, "C", "i", "L-;");
@@ -427,28 +428,30 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
 
   @Test
   @SuppressWarnings("deprecation")
-  public void testDeprecatedVisitMethodInsn_invalidOpcode() {
+  void testDeprecatedVisitMethodInsn_invalidOpcode() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn = () -> checkMethodAdapter.visitMethodInsn(42, "o", "m", "()V");
 
     Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
-    assertEquals("Invalid opcode: 42", exception.getMessage());
+    assertEquals(
+        "Invalid combination of opcode and method: 42, VISIT_METHOD_INSN", exception.getMessage());
   }
 
   @Test
-  public void testVisitMethodInsn_invalidOpcode() {
+  void testVisitMethodInsn_invalidOpcode() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
         () -> checkMethodAdapter.visitMethodInsn(42, "o", "m", "()V", false);
 
     Exception exception = assertThrows(IllegalArgumentException.class, visitMethodInsn);
-    assertEquals("Invalid opcode: 42", exception.getMessage());
+    assertEquals(
+        "Invalid combination of opcode and method: 42, VISIT_METHOD_INSN", exception.getMessage());
   }
 
   @Test
-  public void testVisitMethodInsn_nullName() {
+  void testVisitMethodInsn_nullName() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -459,7 +462,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invalidName() {
+  void testVisitMethodInsn_invalidName() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -472,7 +475,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invalidName2() {
+  void testVisitMethodInsn_invalidName2() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -485,7 +488,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_nullDescriptor() {
+  void testVisitMethodInsn_nullDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -496,7 +499,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invalidDescriptor() {
+  void testVisitMethodInsn_invalidDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -507,7 +510,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invalidParameterDescriptor() {
+  void testVisitMethodInsn_invalidParameterDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -518,7 +521,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invalidReturnDescriptor() {
+  void testVisitMethodInsn_invalidReturnDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -529,7 +532,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_illegalInvokeInterface() {
+  void testVisitMethodInsn_illegalInvokeInterface() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -540,7 +543,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_illegalInvokeInterface2() {
+  void testVisitMethodInsn_illegalInvokeInterface2() {
     checkMethodAdapter.visitCode();
 
     Executable visitMethodInsn =
@@ -551,7 +554,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_illegalInvokeSpecial() {
+  void testVisitMethodInsn_illegalInvokeSpecial() {
     checkMethodAdapter.version = Opcodes.V1_7;
     checkMethodAdapter.visitCode();
 
@@ -564,7 +567,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMethodInsn_invokeSpecialOnInterface() {
+  void testVisitMethodInsn_invokeSpecialOnInterface() {
     checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
 
@@ -575,7 +578,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitInvokeDynamicInsn_illegalHandleTag() {
+  void testVisitInvokeDynamicInsn_illegalHandleTag() {
     checkMethodAdapter.visitCode();
 
     Executable visitInvokeDynamicInsn =
@@ -588,7 +591,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLabel_alreadyVisitedLabel() {
+  void testVisitLabel_alreadyVisitedLabel() {
     Label label = new Label();
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitLabel(label);
@@ -600,7 +603,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v11_illegalOperandType() {
+  void testVisitLdcInsn_v11_illegalOperandType() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
 
@@ -611,7 +614,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v11_primitiveDescriptor() {
+  void testVisitLdcInsn_v11_primitiveDescriptor() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
 
@@ -622,7 +625,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v11_illegalConstantClass() {
+  void testVisitLdcInsn_v11_illegalConstantClass() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
 
@@ -633,7 +636,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v11_methodDescriptor() {
+  void testVisitLdcInsn_v11_methodDescriptor() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
 
@@ -644,7 +647,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v11_handle() {
+  void testVisitLdcInsn_v11_handle() {
     checkMethodAdapter.version = Opcodes.V1_1;
     checkMethodAdapter.visitCode();
 
@@ -656,7 +659,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v18_invalidHandleTag() {
+  void testVisitLdcInsn_v18_invalidHandleTag() {
     checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
 
@@ -668,7 +671,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v18_handle() {
+  void testVisitLdcInsn_v18_handle() {
     checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
 
@@ -681,7 +684,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLdcInsn_v18_illegalHandleName() {
+  void testVisitLdcInsn_v18_illegalHandleName() {
     checkMethodAdapter.version = Opcodes.V1_8;
     checkMethodAdapter.visitCode();
 
@@ -696,7 +699,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTableSwitchInsn_invalidMinMax() {
+  void testVisitTableSwitchInsn_invalidMinMax() {
     checkMethodAdapter.visitCode();
 
     Executable visitTableSwitchInsn =
@@ -707,7 +710,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTableSwitchInsn_invalidDefaultLabel() {
+  void testVisitTableSwitchInsn_invalidDefaultLabel() {
     checkMethodAdapter.visitCode();
 
     Executable visitTableSwitchInsn =
@@ -718,7 +721,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTableSwitchInsn_nullKeyLabels() {
+  void testVisitTableSwitchInsn_nullKeyLabels() {
     checkMethodAdapter.visitCode();
 
     Executable visitTableSwitchInsn =
@@ -729,7 +732,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTableSwitchInsn_invalidKeyLabelCount() {
+  void testVisitTableSwitchInsn_invalidKeyLabelCount() {
     checkMethodAdapter.visitCode();
 
     Executable visitTableSwitchInsn =
@@ -740,7 +743,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLookupSwitchInsn_nullKeyArray_oneLabel() {
+  void testVisitLookupSwitchInsn_nullKeyArray_oneLabel() {
     checkMethodAdapter.visitCode();
 
     Executable visitLookupSwitchInsn =
@@ -751,7 +754,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLookupSwitchInsn_noKey_nullLabelArray() {
+  void testVisitLookupSwitchInsn_noKey_nullLabelArray() {
     checkMethodAdapter.visitCode();
 
     Executable visitLookupSwitchInsn =
@@ -762,7 +765,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLookupSwitchInsn_noKey_oneNullLabel() {
+  void testVisitLookupSwitchInsn_noKey_oneNullLabel() {
     checkMethodAdapter.visitCode();
 
     Executable visitLookupSwitchInsn =
@@ -773,7 +776,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMultiANewArrayInsn_invalidDescriptor() {
+  void testVisitMultiANewArrayInsn_invalidDescriptor() {
     checkMethodAdapter.visitCode();
 
     Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("I", 1);
@@ -784,7 +787,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMultiANewArrayInsn_notEnoughDimensions() {
+  void testVisitMultiANewArrayInsn_notEnoughDimensions() {
     checkMethodAdapter.visitCode();
 
     Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 0);
@@ -794,7 +797,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMultiANewArrayInsn_tooManyDimensions() {
+  void testVisitMultiANewArrayInsn_tooManyDimensions() {
     checkMethodAdapter.visitCode();
 
     Executable visitMultiANewArrayInsn = () -> checkMethodAdapter.visitMultiANewArrayInsn("[[I", 3);
@@ -806,7 +809,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitInsnAnnotation_invalidTypeReference() {
+  void testVisitInsnAnnotation_invalidTypeReference() {
     checkMethodAdapter.visitCode();
 
     Executable visitInsnAnnotation =
@@ -819,7 +822,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTryCatchBlock_afterStartLabel() {
+  void testVisitTryCatchBlock_afterStartLabel() {
     Label label0 = new Label();
     Label label1 = new Label();
     checkMethodAdapter.visitCode();
@@ -833,7 +836,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTryCatchBlock_afterEndLabel() {
+  void testVisitTryCatchBlock_afterEndLabel() {
     Label label0 = new Label();
     Label label1 = new Label();
     checkMethodAdapter.visitCode();
@@ -847,7 +850,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTryCatchBlock_afterHandlerLabel() {
+  void testVisitTryCatchBlock_afterHandlerLabel() {
     Label label0 = new Label();
     Label label1 = new Label();
     checkMethodAdapter.visitCode();
@@ -861,7 +864,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitTryCatchAnnotation_invalidTypeReference() {
+  void testVisitTryCatchAnnotation_invalidTypeReference() {
     checkMethodAdapter.visitCode();
 
     Executable visitTryCatchAnnotation =
@@ -874,7 +877,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariable_invalidRange() {
+  void testVisitLocalVariable_invalidRange() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     checkMethodAdapter.visitCode();
@@ -891,7 +894,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_invalidTypeReference() {
+  void testVisitLocalVariableAnnotation_invalidTypeReference() {
     checkMethodAdapter.visitCode();
 
     Executable visitLocalVariableAnnotation =
@@ -911,7 +914,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_nullStart_noEnd_noIndex() {
+  void testVisitLocalVariableAnnotation_nullStart_noEnd_noIndex() {
     checkMethodAdapter.visitCode();
 
     Executable visitLocalVariableAnnotation =
@@ -933,7 +936,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_noStart_nullEnd_noIndex() {
+  void testVisitLocalVariableAnnotation_noStart_nullEnd_noIndex() {
     checkMethodAdapter.visitCode();
 
     Executable visitLocalVariableAnnotation =
@@ -955,7 +958,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_noStart_oneNullEnd_noIndex() {
+  void testVisitLocalVariableAnnotation_noStart_oneNullEnd_noIndex() {
     checkMethodAdapter.visitCode();
 
     Executable visitLocalVariableAnnotation =
@@ -977,7 +980,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_noStart_noEnd_oneIndex() {
+  void testVisitLocalVariableAnnotation_noStart_noEnd_oneIndex() {
     checkMethodAdapter.visitCode();
 
     Executable visitLocalVariableAnnotation =
@@ -999,7 +1002,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLocalVariableAnnotation_invalidRange() {
+  void testVisitLocalVariableAnnotation_invalidRange() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     checkMethodAdapter.visitCode();
@@ -1025,7 +1028,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitLineNumber_beforeLabel() {
+  void testVisitLineNumber_beforeLabel() {
     checkMethodAdapter.visitCode();
 
     Executable visitLineNumber = () -> checkMethodAdapter.visitLineNumber(0, new Label());
@@ -1035,7 +1038,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMaxs_unvisitedJumpLabels() {
+  void testVisitMaxs_unvisitedJumpLabels() {
     Label label = new Label();
     checkMethodAdapter.visitCode();
     checkMethodAdapter.visitJumpInsn(IFEQ, label);
@@ -1047,7 +1050,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
   }
 
   @Test
-  public void testVisitMaxs_unvisitedTryCatchLabels() {
+  void testVisitMaxs_unvisitedTryCatchLabels() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     Label handlerLabel = new Label();
@@ -1059,11 +1062,11 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
     Executable visitMaxs = () -> checkMethodAdapter.visitMaxs(0, 0);
 
     Exception exception = assertThrows(IllegalStateException.class, visitMaxs);
-    assertEquals("Undefined try catch block labels", exception.getMessage());
+    assertEquals("Undefined label used", exception.getMessage());
   }
 
   @Test
-  public void testVisitMaxs_invalidTryCatchRange() {
+  void testVisitMaxs_invalidTryCatchRange() {
     Label startLabel = new Label();
     Label endLabel = new Label();
     Label handlerLabel = new Label();
@@ -1077,15 +1080,86 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
     Executable visitMaxs = () -> checkMethodAdapter.visitMaxs(0, 0);
 
     Exception exception = assertThrows(IllegalStateException.class, visitMaxs);
-    assertEquals("Emty try catch block handler range", exception.getMessage());
+    assertEquals("Empty try catch block handler range", exception.getMessage());
   }
 
   @Test
-  public void testVisitEnd_invalidDataFlow() {
+  void testVisitEnd_invalidDataFlow() {
     MethodVisitor dataFlowCheckMethodAdapter =
         new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", null, new HashMap<>());
     dataFlowCheckMethodAdapter.visitCode();
-    dataFlowCheckMethodAdapter.visitInsn(RETURN);
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitVarInsn(ASTORE, 0);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(0, 0);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
+    assertTrue(
+        exception
+            .getMessage()
+            .startsWith(
+                "Error at instruction 1: Expected an object reference or a return address, but"
+                    + " found I m(I)I"));
+  }
+
+  @Test
+  void testVisitEnd_noInvalidMaxStackIfClassWriterWithComputeMaxs() {
+    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    MethodVisitor methodVisitor =
+        new CheckMethodAdapter.MethodWriterWrapper(
+            /* latest api = */ Opcodes.ASM9,
+            /* version = */ Opcodes.V1_5,
+            classWriter,
+            new MethodVisitor(/* latest api = */ Opcodes.ASM9) {});
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", methodVisitor, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(0, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    assertDoesNotThrow(visitEnd);
+  }
+
+  @Test
+  void testVisitEnd_noInvalidMaxStackIfClassWriterWithComputeFrames() {
+    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+    MethodVisitor methodVisitor =
+        new CheckMethodAdapter.MethodWriterWrapper(
+            /* latest api = */ Opcodes.ASM9,
+            /* version = */ Opcodes.V1_5,
+            classWriter,
+            new MethodVisitor(/* latest api = */ Opcodes.ASM9) {});
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", methodVisitor, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(0, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    assertDoesNotThrow(visitEnd);
+  }
+
+  @Test
+  void testVisitEnd_invalidMaxStackIfClassWriterWithoutComputeMaxsOrComputeFrames() {
+    ClassWriter classWriter = new ClassWriter(0);
+    MethodVisitor methodVisitor =
+        new CheckMethodAdapter.MethodWriterWrapper(
+            /* latest api = */ Opcodes.ASM9,
+            /* version = */ Opcodes.V1_5,
+            classWriter,
+            new MethodVisitor(/* latest api = */ Opcodes.ASM9) {});
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", methodVisitor, new HashMap<>());
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
     dataFlowCheckMethodAdapter.visitMaxs(0, 2);
 
     Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
@@ -1094,11 +1168,65 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
     assertTrue(
         exception
             .getMessage()
-            .startsWith("Error at instruction 0: Incompatible return type m(I)I"));
+            .startsWith("Error at instruction 0: Insufficient maximum stack size. m(I)I"));
   }
 
   @Test
-  public void testVisitEnd_invalidReturnType() {
+  void testVisitEnd_noMissingFrameIfClassWriterWithComputeFrames() {
+    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+    MethodVisitor methodVisitor =
+        new CheckMethodAdapter.MethodWriterWrapper(
+            /* latest api = */ Opcodes.ASM9,
+            /* version = */ Opcodes.V1_7,
+            classWriter,
+            new MethodVisitor(/* latest api = */ Opcodes.ASM9) {});
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", methodVisitor, new HashMap<>());
+    Label label = new Label();
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitJumpInsn(IFEQ, label);
+    dataFlowCheckMethodAdapter.visitLabel(label);
+    dataFlowCheckMethodAdapter.visitInsn(ICONST_0);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(1, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    assertDoesNotThrow(visitEnd);
+  }
+
+  @Test
+  void testVisitEnd_missingFrameIfClassWriterWithoutComputeFrames() {
+    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    MethodVisitor methodVisitor =
+        new CheckMethodAdapter.MethodWriterWrapper(
+            /* latest api = */ Opcodes.ASM9,
+            /* version = */ Opcodes.V1_7,
+            classWriter,
+            new MethodVisitor(/* latest api = */ Opcodes.ASM9) {});
+    MethodVisitor dataFlowCheckMethodAdapter =
+        new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)I", methodVisitor, new HashMap<>());
+    Label label = new Label();
+    dataFlowCheckMethodAdapter.visitCode();
+    dataFlowCheckMethodAdapter.visitVarInsn(ILOAD, 1);
+    dataFlowCheckMethodAdapter.visitJumpInsn(IFEQ, label);
+    dataFlowCheckMethodAdapter.visitLabel(label);
+    dataFlowCheckMethodAdapter.visitInsn(ICONST_0);
+    dataFlowCheckMethodAdapter.visitInsn(IRETURN);
+    dataFlowCheckMethodAdapter.visitMaxs(1, 2);
+
+    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
+
+    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
+    assertTrue(
+        exception
+            .getMessage()
+            .startsWith("Error at instruction 1: Expected stack map frame at instruction 2 m(I)I"));
+  }
+
+  @Test
+  void testVisitEnd_invalidReturnType() {
     MethodVisitor dataFlowCheckMethodAdapter =
         new CheckMethodAdapter(ACC_PUBLIC, "m", "(I)V", null, new HashMap<>());
     dataFlowCheckMethodAdapter.visitCode();
@@ -1113,23 +1241,7 @@ public class CheckMethodAdapterTest extends AsmTest implements Opcodes {
         exception
             .getMessage()
             .startsWith(
-                "Error at instruction 1: Incompatible return type: expected null, but found I m(I)V"));
-  }
-
-  @Test
-  public void testVisitEnd_dataflowCheckRequiresMaxLocalsAndMaxStack() {
-    CheckMethodAdapter dataFlowCheckMethodAdapter =
-        new CheckMethodAdapter(0, "m", "()V", null, new HashMap<>());
-    dataFlowCheckMethodAdapter.visitCode();
-    dataFlowCheckMethodAdapter.visitVarInsn(ALOAD, 0);
-    dataFlowCheckMethodAdapter.visitInsn(RETURN);
-    dataFlowCheckMethodAdapter.visitMaxs(0, 0);
-
-    Executable visitEnd = () -> dataFlowCheckMethodAdapter.visitEnd();
-
-    Exception exception = assertThrows(IllegalArgumentException.class, visitEnd);
-    assertEquals(
-        "Data flow checking option requires valid, non zero maxLocals and maxStack.",
-        exception.getMessage());
+                "Error at instruction 1: Incompatible return type: expected null, but found I"
+                    + " m(I)V"));
   }
 }
