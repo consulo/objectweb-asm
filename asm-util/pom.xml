@@ -6,7 +6,7 @@
 
 	<groupId>org.objectweb.asm</groupId>
 	<artifactId>asm-util</artifactId>
-	<version>9.6.1-SNAPSHOT</version>
+	<version>9.6.1</version>
 
 	<build>
 		<plugins>
